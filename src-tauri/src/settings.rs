@@ -10,12 +10,35 @@ pub struct Settings {
     pub moonshot: MoonshotSettings,
     pub macros: Vec<Macro>,
     pub profile: ProfileSettings,
+    pub network: NetworkSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct ProfileSettings {
     pub nick: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct NetworkSettings {
+    pub server_url: String,
+    pub token: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+}
+
+impl Default for NetworkSettings {
+    fn default() -> Self {
+        Self {
+            server_url: "http://localhost:8080".to_string(),
+            token: String::new(),
+            account_id: None,
+            username: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

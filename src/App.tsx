@@ -11,6 +11,8 @@ import { MacrosDialog } from "./components/MacrosDialog";
 import { UpdateToast } from "./components/UpdateToast";
 import { ChangelogDialog } from "./components/ChangelogDialog";
 import { ProfileDialog } from "./components/ProfileDialog";
+import { NetworkAccountDialog } from "./components/NetworkAccountDialog";
+import * as serverApi from "./lib/serverApi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MODELS } from "./data/models";
 import { checkConfigured, streamChat, welcomeText, ProviderError } from "./lib/providers";
@@ -96,6 +98,7 @@ export default function App() {
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileForcedFirstRun, setProfileForcedFirstRun] = useState(false);
+  const [networkOpen, setNetworkOpen] = useState(false);
   const [sessionMacrosBySession, setSessionMacrosBySession] = useState<
     Record<string, string[]>
   >({});
@@ -144,6 +147,27 @@ export default function App() {
       if (!s.profile?.nick || s.profile.nick.trim().length === 0) {
         setProfileForcedFirstRun(true);
         setProfileOpen(true);
+      }
+      // Walidacja JWT przy starcie. Jeśli nieważny → wyczyść z settings,
+      // żeby przy następnym otwarciu NetworkAccountDialog user widział
+      // formularz logowania zamiast „już zalogowany".
+      if (s.network?.token && s.network.server_url) {
+        try {
+          await serverApi.me(s.network.server_url, s.network.token);
+        } catch (e) {
+          if (e instanceof serverApi.ServerError && e.status === 401) {
+            console.warn("[network] zapisany token jest nieważny, czyszczę");
+            const cleared = {
+              ...s,
+              network: { ...s.network, token: "", account_id: null, username: null },
+            };
+            await import("./lib/settings").then((m) => m.saveSettings(cleared));
+            setSettings(cleared);
+          } else {
+            // Serwer down albo network error — zostawiamy token, spróbujemy później.
+            console.info("[network] /me check skipped:", e);
+          }
+        }
       }
     })();
     // Sprawdź aktualizacje w tle przy starcie + co 5 minut + przy powrocie
@@ -493,6 +517,8 @@ export default function App() {
       <Toolbar
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenMacros={() => setMacrosOpen(true)}
+        onOpenNetwork={() => setNetworkOpen(true)}
+        networkOnline={false /* phase 2B.3 podepnie WS state */}
       />
       <div className="gg-body">
         <Sidebar
@@ -540,6 +566,12 @@ export default function App() {
         onSaved={onSettingsSaved}
       />
       <ChangelogDialog open={changelogOpen} onClose={() => setChangelogOpen(false)} />
+      <NetworkAccountDialog
+        open={networkOpen}
+        settings={settings}
+        onClose={() => setNetworkOpen(false)}
+        onSaved={onSettingsSaved}
+      />
       <ProfileDialog
         open={profileOpen}
         initialNick={settings.profile?.nick ?? ""}

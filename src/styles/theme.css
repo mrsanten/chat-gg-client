@@ -1680,3 +1680,23 @@ input, textarea {
   z-index: 1000;
   animation: gg-update-toast-slide 200ms ease-out;
 }
+
+/* Toolbar Sieć — kropka statusu WS */
+.gg-toolbar-btn {
+  position: relative;
+}
+.gg-toolbar-net-dot {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b8b8b8;
+  border: 1px solid #6a6a6a;
+}
+.gg-toolbar-net-dot.is-online {
+  background: var(--gg-green-light);
+  border-color: var(--gg-green);
+  box-shadow: 0 0 4px rgba(46, 184, 46, 0.7);
+}

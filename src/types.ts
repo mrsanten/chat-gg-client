@@ -87,6 +87,16 @@ export interface ProfileSettings {
   nick: string;
 }
 
+export interface NetworkSettings {
+  /** URL serwera GAIdu (REST + WSS). Bez trailing slasha. */
+  server_url: string;
+  /** JWT z `/auth/login`. Pusty string = wylogowany. */
+  token: string;
+  /** Cache po loginie — wyświetlanie bez czekania na /me. */
+  account_id?: string | null;
+  username?: string | null;
+}
+
 export interface Settings {
   anthropic: {
     auth: AnthropicAuth;
@@ -102,6 +112,7 @@ export interface Settings {
   };
   macros: Macro[];
   profile: ProfileSettings;
+  network: NetworkSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -110,4 +121,10 @@ export const DEFAULT_SETTINGS: Settings = {
   moonshot: { auth: { mode: "none" }, model_id: null },
   macros: [],
   profile: { nick: "" },
+  network: {
+    server_url: "http://localhost:8080",
+    token: "",
+    account_id: null,
+    username: null,
+  },
 };

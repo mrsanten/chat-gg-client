@@ -34,5 +34,14 @@ function mergeDefaults(s: Partial<Settings> | null | undefined): Settings {
     profile: {
       nick: typeof s.profile?.nick === "string" ? s.profile.nick : "",
     },
+    network: {
+      server_url:
+        typeof s.network?.server_url === "string" && s.network.server_url
+          ? s.network.server_url
+          : "http://localhost:8080",
+      token: typeof s.network?.token === "string" ? s.network.token : "",
+      account_id: s.network?.account_id ?? null,
+      username: s.network?.username ?? null,
+    },
   };
 }
