@@ -172,23 +172,118 @@ docker compose down -v
 docker compose up -d postgres
 ```
 
-## Deploy na VPS (skrót, do uszczegółowienia w ADR-0003)
+## Deploy na VPS
 
-1. Sklonuj repo na VPS, zainstaluj Docker + Caddy.
-2. W `server/.env` ustaw produkcyjny `JWT_SECRET` (`openssl rand -hex 64`)
-   oraz `DATABASE_URL` wskazujący na Postgresa (też jako container).
-3. Stwórz `docker-compose.prod.yml` rozszerzający `docker-compose.yml`
-   o serwis `app` z lokalnym Dockerfile + sieci.
-4. W Caddy:
+Wymaga: VPS z Linuxem (Debian/Ubuntu LTS), publicznego IPv4, domeny z
+rekordem A wskazującym na ten VPS.
 
+### Jednorazowo
+
+1. **Zainstaluj Docker + Caddy:**
+   ```bash
+   curl -fsSL https://get.docker.com | sh
+   sudo apt update
+   sudo apt install -y caddy git
    ```
-   gaidu.example.com {
-       reverse_proxy localhost:8080
-   }
-   ```
 
-   ACME zrobi się sam.
-5. Backup: cron `pg_dump | age | aws s3 cp -` raz dziennie.
+2. **Sklonuj repo, ustaw sekrety:**
+   ```bash
+   git clone https://github.com/mrsanten/chat-gg-client.git
+   cd chat-gg-client/server
+   cp .env.example .env
+   sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 64)|" .env
+   echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" >> .env
+   chmod 600 .env
+   ```
+   `POSTGRES_PASSWORD` jest brane z env do `docker-compose.prod.yml` (patrz
+   tam — DATABASE_URL składamy z tego pola).
+
+3. **Caddy:**
+   ```bash
+   sudo cp Caddyfile.example /etc/caddy/Caddyfile
+   sudo sed -i "s|DOMAIN.example.com|gg.tojadomena.pl|" /etc/caddy/Caddyfile
+   sudo sed -i "s|admin@example.com|ty@tojadomena.pl|" /etc/caddy/Caddyfile
+   sudo systemctl reload caddy
+   ```
+   Caddy automatycznie pobierze cert z Let's Encrypt przy pierwszym żądaniu
+   na domenę. Zobacz logi: `sudo journalctl -u caddy -f`.
+
+4. **Pierwszy start:**
+   ```bash
+   ./scripts/deploy.sh main
+   ```
+   Skrypt zbuduje obraz, odpali compose z prod overlay, poczeka na
+   `/healthz`. Wynik: aplikacja działa na `127.0.0.1:8080`, Caddy odbiera
+   z `https://gg.tojadomena.pl` i forwarduje.
+
+### Aktualizacja do nowej wersji
+
+Z VPS-a (lub przez ssh):
+
+```bash
+cd ~/chat-gg-client/server
+./scripts/deploy.sh main          # ostatni main
+# albo:
+./scripts/deploy.sh v0.7.0        # konkretny tag
+```
+
+Skrypt robi `git fetch + checkout`, rebuild obrazu, `docker compose up -d`,
+i czeka aż healthcheck odpowie 200. Jeśli nie odpowie w 60s, dumpuje
+ostatnie 50 linii logów.
+
+### Backupy
+
+Ręcznie:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm backup
+# Tworzy ./backups/gaidu-YYYYMMDD-HHMMSS.sql.gz
+# Auto-rotation: pliki starsze niż 14 dni są kasowane
+```
+
+W cronie hosta (codziennie o 3:00):
+```bash
+crontab -e
+# 0 3 * * * cd /home/USER/chat-gg-client/server && docker compose -f docker-compose.yml -f docker-compose.prod.yml run --rm backup >> /var/log/gaidu-backup.log 2>&1
+```
+
+Folder `./backups/` warto syncować na zewnątrz (rclone do S3/B2, `borg`,
+albo ręczny scp).
+
+### Klient → produkcyjny serwer
+
+W aplikacji desktop:
+
+1. Toolbar → 🌐 Sieć
+2. Server URL: `https://gg.tojadomena.pl`
+3. „Sprawdź" — powinno pokazać ✓.
+4. Zarejestruj się.
+
+WSS i auto-reconnect działają same — `lib/network.ts` dobiera schemat
+WS/WSS po prefixie http/https.
+
+### Pliki używane przez deploy
+
+- [`docker-compose.yml`](docker-compose.yml) — wspólne dla dev i prod
+  (Postgres, healthcheck, volume).
+- [`docker-compose.prod.yml`](docker-compose.prod.yml) — overlay: chowa
+  port Postgresa, dorzuca serwis `app` zbudowany z `Dockerfile`, wystawia
+  8080 tylko na localhost, dorzuca `backup` worker.
+- [`Caddyfile.example`](Caddyfile.example) — szablon TLS termination z
+  HSTS, JSON access logs, ukrytym `Server` headerem.
+- [`scripts/deploy.sh`](scripts/deploy.sh) — git pull + rebuild + restart
+  + healthcheck wait. Idempotentny.
+
+### Co jeszcze jest poza scope tego setupu
+
+- **Rate limiting** na `/auth/login`. Realnie potrzebne przed publicznym
+  launchem; tower-governor + skonfigurowana whitelista IP.
+- **Audit log** prób logowania (kto, kiedy, skąd, sukces/porażka).
+- **Rewokacja JWT** — obecnie token żyje 30 dni od wystawienia, brak
+  blacklisty. Wylogowanie w kliencie czyści go tylko lokalnie.
+- **Refresh tokens** + krótszy access TTL (np. 1h).
+- **Monitoring** (Prometheus exporter, alerty na padający `/healthz`).
+
+Te punkty pojadą w issuesach zanim publicznie powiemy „dołącz do GAIdu".
 
 ## Reguły walidacji
 

@@ -1,0 +1,39 @@
+# Skopiuj do /etc/caddy/Caddyfile na VPS-ie i podmień DOMAIN.
+# Caddy automatycznie pobierze cert z Let's Encrypt i będzie go odnawiał.
+#
+# Wymaga: rekord A i AAAA dla DOMAIN wskazujący na IP tego VPS-a.
+# Po edycji: `sudo systemctl reload caddy`
+
+{
+    # Globalne. Email do alertów Let's Encrypt.
+    email admin@example.com
+}
+
+DOMAIN.example.com {
+    # Reverse proxy do gaidu-server (nasłuchuje na 127.0.0.1:8080).
+    # Caddy obsługuje upgrade WebSocketa automatycznie.
+    reverse_proxy localhost:8080
+
+    # Logi w formacie JSON (łatwo przerzucić do Loki/Vector później).
+    log {
+        output file /var/log/caddy/gaidu-access.log {
+            roll_size 100mb
+            roll_keep 7
+        }
+        format json
+    }
+
+    # Bezpieczne nagłówki HTTP.
+    header {
+        # HSTS na rok, włącznie z subdomenami.
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # Anti-clickjacking.
+        X-Frame-Options "DENY"
+        # Anti-MIME-sniffing.
+        X-Content-Type-Options "nosniff"
+        # Referrer policy minimalizująca leak.
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Wyciszenie nagłówka Server (info o wersji Caddy).
+        -Server
+    }
+}
