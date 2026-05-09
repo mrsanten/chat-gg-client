@@ -13,7 +13,9 @@ Hosting: [ADR-0002](../docs/adr/0002-server-hosting.md).
 - sqlx (runtime queries, bez `query!` macra — żeby kompilacja nie wymagała
   działającej bazy)
 
-## Endpointy (phase 1)
+## Endpointy
+
+### Phase 1 (auth)
 
 | Metoda | Ścieżka          | Auth | Opis                                       |
 |--------|------------------|------|--------------------------------------------|
@@ -23,6 +25,61 @@ Hosting: [ADR-0002](../docs/adr/0002-server-hosting.md).
 | GET    | `/me`            | JWT  | Info o zalogowanym koncie.                 |
 
 JWT przekazywany w `Authorization: Bearer <token>`.
+
+### Phase 2 (chat 1:1)
+
+| Metoda | Ścieżka                    | Auth | Opis                                    |
+|--------|----------------------------|------|-----------------------------------------|
+| POST   | `/contacts`                | JWT  | Dodaj znajomego (auto-bidirectional).   |
+| GET    | `/contacts`                | JWT  | Lista znajomych z flagą `online`.       |
+| DELETE | `/contacts/:peer_id`       | JWT  | Usuń znajomego (oba kierunki).          |
+| GET    | `/history?peer=&limit=&before=` | JWT | Historia konwersacji (paginowana).  |
+| GET    | `/ws?token=<jwt>`          | query| Upgrade do WebSocketa.                  |
+
+`limit` 1..=200 (default 50), `before` ISO 8601 (cursor — wiadomości starsze).
+
+## WebSocket protokół
+
+Auth: token w query stringu (`?token=<jwt>`), bo Tauri/przeglądarki nie mają
+łatwego sposobu wysłania custom headera przy upgrade. JWT jest weryfikowany
+*przed* upgrade'm, więc zły token = 401 bez handshake'u.
+
+Po nawiązaniu połączenia, w kolejności:
+1. `ServerEvent::Ready { account_id, username }`
+2. Wszystkie niedostarczone wiadomości z bazy jako `Message` (FIFO).
+3. Jeśli to było pierwsze połączenie tego usera → wszyscy jego znajomi
+   z otwartymi WS dostają `Presence { username, online: true }`.
+4. Gdy ostatnie połączenie usera zamyka się → broadcast `online: false`.
+
+### Klient → serwer (`ClientEvent`)
+
+```jsonc
+// 1:1 wiadomość
+{"type":"send", "to":"username", "body":"...", "client_msg_id":"opt"}
+
+// Status pisania
+{"type":"typing", "to":"username", "state":"start"|"stop"}
+
+// Potwierdzenie odbioru (idempotentne)
+{"type":"ack_delivery", "message_id":"<uuid>"}
+
+// Heartbeat
+{"type":"ping"}
+```
+
+### Serwer → klient (`ServerEvent`)
+
+```jsonc
+{"type":"ready", "account_id":"<uuid>", "username":"alice"}
+{"type":"message", "id":"<uuid>", "from":"alice", "body":"...", "created_at":"..."}
+{"type":"sent", "id":"<uuid>", "client_msg_id":"opt", "to":"bob", "created_at":"..."}
+{"type":"typing", "from":"bob", "state":"start"|"stop"}
+{"type":"presence", "username":"bob", "online":true}
+{"type":"pong"}
+{"type":"error", "code":"...", "message":"..."}
+```
+
+Limity: `body` ≤ 64 KiB. Większe = `error{code:"body_too_large"}`.
 
 ## Lokalny start
 
@@ -71,6 +128,41 @@ curl -s -X POST http://localhost:8080/auth/login \
 curl -s -X POST http://localhost:8080/auth/register \
   -H 'content-type: application/json' \
   -d '{"username":"alice","password":"hunter2hunter2"}' -i | head -1
+```
+
+### Phase 2: contacts + chat WS
+
+```bash
+# Drugie konto
+curl -s -X POST http://localhost:8080/auth/register \
+  -H 'content-type: application/json' \
+  -d '{"username":"bob","password":"hunter2hunter2"}' | jq
+
+# Dodaj boba do kontaktów alice (auto-bidirectional)
+curl -s -X POST http://localhost:8080/contacts \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"username":"bob"}' | jq
+
+# Lista kontaktów alice
+curl -s http://localhost:8080/contacts \
+  -H "authorization: Bearer $TOKEN" | jq
+
+# Historia z bobem (paginowana)
+curl -s "http://localhost:8080/history?peer=bob&limit=20" \
+  -H "authorization: Bearer $TOKEN" | jq
+
+# WebSocket. Najprościej Node.js (ma natywny WebSocket od v22):
+node -e '
+const ws = new WebSocket("ws://localhost:8080/ws?token='"$TOKEN"'");
+ws.onmessage = (e) => console.log("←", e.data);
+ws.onopen = () => {
+  setTimeout(() => ws.send(JSON.stringify({
+    type:"send", to:"bob", body:"halo", client_msg_id:"x1"
+  })), 200);
+  setTimeout(() => ws.close(), 1500);
+};
+'
 ```
 
 ## Reset bazy lokalnie

@@ -5,7 +5,8 @@ edition = "2021"
 description = "GAIdu GAIdu sieciowy backend (auth, presence, message relay)"
 
 [dependencies]
-axum = { version = "0.8", features = ["macros"] }
+axum = { version = "0.8", features = ["macros", "ws"] }
+futures-util = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["trace", "cors"] }

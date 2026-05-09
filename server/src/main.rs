@@ -1,7 +1,11 @@
 mod auth;
 mod config;
+mod contacts;
 mod error;
+mod history;
+mod hub;
 mod state;
+mod ws;
 
 use anyhow::Context;
 use axum::extract::State;
@@ -41,6 +45,13 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/register", post(auth::handlers::register))
         .route("/auth/login", post(auth::handlers::login))
         .route("/me", get(auth::handlers::me))
+        .route(
+            "/contacts",
+            get(contacts::list_contacts).post(contacts::add_contact),
+        )
+        .route("/contacts/{peer_id}", axum::routing::delete(contacts::remove_contact))
+        .route("/history", get(history::history))
+        .route("/ws", get(ws::ws_handler))
         .with_state(state)
         .layer(TraceLayer::new_for_http())
         .layer(

@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::hub::Hub;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
@@ -11,6 +12,7 @@ pub struct AppState {
     pub db: PgPool,
     pub jwt: JwtKeys,
     pub jwt_ttl: Duration,
+    pub hub: Hub,
 }
 
 #[derive(Clone)]
@@ -40,6 +42,7 @@ impl AppState {
             db,
             jwt: JwtKeys::from_secret(&cfg.jwt_secret),
             jwt_ttl: cfg.jwt_ttl,
+            hub: Hub::new(),
         })
     }
 }
