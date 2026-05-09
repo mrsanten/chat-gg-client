@@ -12,10 +12,12 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "0.5.4",
+    version: "0.5.5",
     date: "2026-05-09",
     notes: [
       'W stopce panelu bocznego pojawia się sekcja reklamowa: grafika Larry\'ego po lewej, tekst po prawej („A czy ty zjadłeś japuszko? Larry patrzy!").',
+      "Drobne porządki w UI: neutralny placeholder w polu nicka.",
+      "Pod kapotą: pierwsze fundamenty serwera czatu między użytkownikami (auth + chat 1:1 + offline queue + presence). Patrz docs/adr/0001 i server/. To na razie nie dotyka klienta — integracja w kolejnej wersji.",
     ],
   },
   {
