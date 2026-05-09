@@ -12,6 +12,8 @@ interface Props {
   onSelectSession: (id: string) => void;
   onNewSession: () => void;
   onDeleteSession: (id: string) => void;
+  nick?: string;
+  onEditProfile?: () => void;
 }
 
 export function Sidebar(props: Props) {
@@ -25,12 +27,12 @@ export function Sidebar(props: Props) {
     onSelectSession,
     onNewSession,
     onDeleteSession,
+    nick,
+    onEditProfile,
   } = props;
 
   const [openTools, setOpenTools] = useState(true);
   const [openHistory, setOpenHistory] = useState(true);
-  const [openContacts, setOpenContacts] = useState(false);
-  const [openGroups, setOpenGroups] = useState(false);
   const [desc, setDesc] = useState("");
 
   const activeModel = models.find((m) => m.id === activeModelId);
@@ -46,7 +48,14 @@ export function Sidebar(props: Props) {
           <div className="gg-profile-avatar-bar" aria-hidden />
         </div>
         <div className="gg-profile-info">
-          <div className="gg-profile-name">Użytkownik</div>
+          <div
+            className="gg-profile-name"
+            onClick={onEditProfile}
+            title={onEditProfile ? "Edytuj profil" : undefined}
+            role={onEditProfile ? "button" : undefined}
+          >
+            {nick && nick.trim().length > 0 ? nick : "Użytkownik"}
+          </div>
           <div className="gg-profile-status">Dostępny</div>
           <input
             className="gg-profile-desc"
@@ -126,19 +135,6 @@ export function Sidebar(props: Props) {
           </div>
         ))}
       </Section>
-
-      <Section
-        title="Kontakty"
-        count="(0/0)"
-        open={openContacts}
-        onToggle={() => setOpenContacts((v) => !v)}
-      />
-      <Section
-        title="Grupy"
-        count="(0/0)"
-        open={openGroups}
-        onToggle={() => setOpenGroups((v) => !v)}
-      />
 
       <div className="gg-sidebar-footer">
         <div className="gg-sidebar-footer-brand">

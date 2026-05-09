@@ -9,6 +9,9 @@ import { Statusbar } from "./components/Statusbar";
 import { SettingsDialog } from "./components/Settings";
 import { MacrosDialog } from "./components/MacrosDialog";
 import { UpdateToast } from "./components/UpdateToast";
+import { ChangelogDialog } from "./components/ChangelogDialog";
+import { ProfileDialog } from "./components/ProfileDialog";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MODELS } from "./data/models";
 import { checkConfigured, streamChat, welcomeText, ProviderError } from "./lib/providers";
 import { augmentForApi } from "./lib/macros";
@@ -20,6 +23,7 @@ import {
   type DownloadStatus,
   type PendingUpdate,
 } from "./lib/updater";
+import { saveSettings } from "./lib/settings";
 import {
   deleteSession as deleteSessionRpc,
   deriveTitle,
@@ -89,6 +93,9 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [macrosOpen, setMacrosOpen] = useState(false);
+  const [changelogOpen, setChangelogOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileForcedFirstRun, setProfileForcedFirstRun] = useState(false);
   const [sessionMacrosBySession, setSessionMacrosBySession] = useState<
     Record<string, string[]>
   >({});
@@ -130,6 +137,10 @@ export default function App() {
       const [s, sess] = await Promise.all([loadSettings(), listSessions()]);
       setSettings(s);
       setSessions(sess);
+      if (!s.profile?.nick || s.profile.nick.trim().length === 0) {
+        setProfileForcedFirstRun(true);
+        setProfileOpen(true);
+      }
     })();
     // Sprawdź aktualizacje w tle przy starcie. Jeśli nowa wersja istnieje,
     // wystawimy popup w prawym górnym rogu — nic samo się nie zainstaluje.
@@ -219,6 +230,27 @@ export default function App() {
 
   const onSettingsSaved = (s: Settings) => {
     setSettings(s);
+  };
+
+  const onSaveNick = async (nick: string) => {
+    const next: Settings = { ...settings, profile: { ...settings.profile, nick } };
+    await saveSettings(next);
+    setSettings(next);
+    setProfileOpen(false);
+    setProfileForcedFirstRun(false);
+  };
+
+  const onCancelProfile = () => {
+    if (profileForcedFirstRun) return;
+    setProfileOpen(false);
+  };
+
+  const onQuit = async () => {
+    try {
+      await getCurrentWindow().close();
+    } catch (e) {
+      console.warn("[quit]", e);
+    }
   };
 
   const sessionMacroKey = activeSessionId ?? PENDING_SESSION_KEY;
@@ -395,7 +427,11 @@ export default function App() {
   return (
     <div className="gg-window">
       <Titlebar title="GAIdu GAIdu 10" />
-      <Menubar />
+      <Menubar
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenChangelog={() => setChangelogOpen(true)}
+        onQuit={onQuit}
+      />
       <Toolbar
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenMacros={() => setMacrosOpen(true)}
@@ -411,6 +447,11 @@ export default function App() {
           onSelectSession={onSelectSession}
           onNewSession={onNewSession}
           onDeleteSession={onDeleteSession}
+          nick={settings.profile?.nick}
+          onEditProfile={() => {
+            setProfileForcedFirstRun(false);
+            setProfileOpen(true);
+          }}
         />
         <main className="gg-main">
           <Conversation
@@ -439,6 +480,14 @@ export default function App() {
         open={macrosOpen}
         onClose={() => setMacrosOpen(false)}
         onSaved={onSettingsSaved}
+      />
+      <ChangelogDialog open={changelogOpen} onClose={() => setChangelogOpen(false)} />
+      <ProfileDialog
+        open={profileOpen}
+        initialNick={settings.profile?.nick ?? ""}
+        required={profileForcedFirstRun}
+        onSave={onSaveNick}
+        onCancel={onCancelProfile}
       />
       {pendingUpdate && (
         <UpdateToast

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import sunIcon from "../assets/sun.svg";
 
 function clock() {
@@ -8,9 +9,17 @@ function clock() {
 
 export function Statusbar() {
   const [time, setTime] = useState(clock());
+  const [version, setVersion] = useState<string | null>(null);
+
   useEffect(() => {
     const t = setInterval(() => setTime(clock()), 1000 * 30);
     return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    getVersion()
+      .then(setVersion)
+      .catch(() => setVersion(null));
   }, []);
 
   return (
@@ -19,6 +28,11 @@ export function Statusbar() {
         <span className="gg-statusbar-clock"><img src={sunIcon} alt="" /></span>
         <span>{time}</span>
       </div>
+      {version && (
+        <div className="gg-statusbar-cell gg-statusbar-version">
+          <span title="Wersja aplikacji">v{version}</span>
+        </div>
+      )}
       <div className="gg-statusbar-cell">
         <span>Połączony z siecią GG</span>
         <span className="gg-signal" aria-hidden>

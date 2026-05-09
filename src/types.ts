@@ -82,6 +82,10 @@ export interface Macro {
   auto_send?: boolean;
 }
 
+export interface ProfileSettings {
+  nick: string;
+}
+
 export interface Settings {
   anthropic: {
     auth: AnthropicAuth;
@@ -96,6 +100,7 @@ export interface Settings {
     model_id?: string | null;
   };
   macros: Macro[];
+  profile: ProfileSettings;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -103,4 +108,5 @@ export const DEFAULT_SETTINGS: Settings = {
   openai: { auth: { mode: "none" }, model_id: null },
   moonshot: { auth: { mode: "none" }, model_id: null },
   macros: [],
+  profile: { nick: "" },
 };

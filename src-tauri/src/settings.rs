@@ -9,6 +9,13 @@ pub struct Settings {
     pub openai: OpenAiSettings,
     pub moonshot: MoonshotSettings,
     pub macros: Vec<Macro>,
+    pub profile: ProfileSettings,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct ProfileSettings {
+    pub nick: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

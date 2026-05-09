@@ -31,5 +31,8 @@ function mergeDefaults(s: Partial<Settings> | null | undefined): Settings {
       model_id: s.moonshot?.model_id ?? null,
     },
     macros: Array.isArray(s.macros) ? s.macros : [],
+    profile: {
+      nick: typeof s.profile?.nick === "string" ? s.profile.nick : "",
+    },
   };
 }
