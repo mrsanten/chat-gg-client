@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" shape-rendering="geometricPrecision">
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#5fa8ff" />
+      <stop offset="55%" stop-color="#1f6cd8" />
+      <stop offset="100%" stop-color="#082882" />
+    </radialGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45" />
+      <stop offset="48%" stop-color="#ffffff" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff7a0" stop-opacity="0.85" />
+      <stop offset="60%" stop-color="#ffd83a" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#ffd83a" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="body" cx="50%" cy="42%" r="55%">
+      <stop offset="0%" stop-color="#fff7a0" />
+      <stop offset="55%" stop-color="#ffd83a" />
+      <stop offset="100%" stop-color="#e89c00" />
+    </radialGradient>
+  </defs>
+
+  <!-- Tło: zaokrąglony XP-blue square -->
+  <rect x="0" y="0" width="1024" height="1024" rx="200" ry="200" fill="url(#sky)" />
+  <!-- Górny połysk -->
+  <rect x="0" y="0" width="1024" height="1024" rx="200" ry="200" fill="url(#gloss)" />
+
+  <!-- Halo wokół słońca -->
+  <circle cx="512" cy="500" r="430" fill="url(#halo)" />
+
+  <!-- Promienie słońca (8) -->
+  <g fill="#ffd83a" stroke="#a86a00" stroke-width="6" stroke-linejoin="round">
+    <polygon points="512,120 552,240 472,240" />
+    <polygon points="512,880 552,760 472,760" />
+    <polygon points="120,500 240,460 240,540" />
+    <polygon points="904,500 784,460 784,540" />
+    <polygon points="220,220 320,290 290,320" />
+    <polygon points="804,220 704,290 734,320" />
+    <polygon points="220,780 320,710 290,680" />
+    <polygon points="804,780 704,710 734,680" />
+  </g>
+
+  <!-- Korpus słońca -->
+  <circle cx="512" cy="500" r="280" fill="url(#body)" stroke="#a86a00" stroke-width="14" />
+
+  <!-- Twarz -->
+  <circle cx="412" cy="460" r="32" fill="#1a1a1a" />
+  <circle cx="612" cy="460" r="32" fill="#1a1a1a" />
+  <circle cx="370" cy="540" r="28" fill="#ff8a8a" opacity="0.7" />
+  <circle cx="654" cy="540" r="28" fill="#ff8a8a" opacity="0.7" />
+  <path d="M 412 600 Q 512 700 612 600" stroke="#1a1a1a" stroke-width="32" fill="none" stroke-linecap="round" />
+
+  <!-- AI sparkle w prawym dolnym narożniku -->
+  <g transform="translate(820 820)">
+    <circle r="120" fill="#ffffff" stroke="#082882" stroke-width="10" />
+    <!-- 4-pointed sparkle -->
+    <path d="M 0 -82 C 8 -28 28 -8 82 0 C 28 8 8 28 0 82 C -8 28 -28 8 -82 0 C -28 -8 -8 -28 0 -82 Z" fill="#082882" />
+    <circle cx="-44" cy="-44" r="10" fill="#5fa8ff" />
+    <circle cx="44" cy="44" r="6" fill="#5fa8ff" />
+  </g>
+</svg>

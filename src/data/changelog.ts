@@ -12,6 +12,14 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.2",
+    date: "2026-05-09",
+    notes: [
+      "Nowa ikona aplikacji (XP-blue niebo, słoneczko z promieniami, AI-sparkle).",
+      'Aplikacja sprawdza dostępność aktualizacji co 5 minut oraz przy powrocie do okna, nie tylko przy starcie. „Później" wycisza powiadomienie dla danej wersji do końca działania apki.',
+    ],
+  },
+  {
     version: "0.5.1",
     date: "2026-05-09",
     notes: [

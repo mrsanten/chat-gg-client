@@ -101,6 +101,8 @@ export default function App() {
   >({});
   const [pendingUpdate, setPendingUpdate] = useState<PendingUpdate | null>(null);
   const [updateStatus, setUpdateStatus] = useState<DownloadStatus>({ state: "idle" });
+  const dismissedVersionRef = useRef<string | null>(null);
+  const pendingUpdateRef = useRef<PendingUpdate | null>(null);
   const [activeModelId, setActiveModelId] = useState<string>(MODELS[0].id);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [activeSessionByModel, setActiveSessionByModel] = useState<Record<string, string | null>>(
@@ -142,13 +144,41 @@ export default function App() {
         setProfileOpen(true);
       }
     })();
-    // Sprawdź aktualizacje w tle przy starcie. Jeśli nowa wersja istnieje,
-    // wystawimy popup w prawym górnym rogu — nic samo się nie zainstaluje.
-    checkForUpdate().then((pending) => {
-      if (pending) setPendingUpdate(pending);
-    });
-    return () => abortRef.current?.abort();
+    // Sprawdź aktualizacje w tle przy starcie + co 5 minut + przy powrocie
+    // do okna. Jeśli nowa wersja istnieje, wystawimy popup w prawym górnym
+    // rogu (chyba że user już go odrzucił dla tej samej wersji).
+    const tryCheck = async () => {
+      const pending = await checkForUpdate();
+      if (!pending) return;
+      // Nie odświeżamy aktywnego toasta tym samym buildem.
+      if (
+        pendingUpdateRef.current &&
+        pendingUpdateRef.current.version === pending.version
+      ) {
+        return;
+      }
+      // Nie wracaj z tym samym numerkiem, jeśli user kliknął „Później".
+      if (dismissedVersionRef.current === pending.version) return;
+      setPendingUpdate(pending);
+    };
+    void tryCheck();
+    const interval = window.setInterval(tryCheck, 5 * 60 * 1000);
+    const onFocus = () => {
+      void tryCheck();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      abortRef.current?.abort();
+    };
   }, []);
+
+  // Trzymaj refy w sync z aktualnym state'em, żeby callback z setIntervala
+  // używał świeżych wartości bez wymuszania re-rejestracji.
+  useEffect(() => {
+    pendingUpdateRef.current = pendingUpdate;
+  }, [pendingUpdate]);
 
   const onInstallUpdate = async () => {
     if (!pendingUpdate) return;
@@ -156,6 +186,7 @@ export default function App() {
     // Po sukcesie nastąpił `relaunch()`, więc tu nie dojdziemy.
   };
   const onDismissUpdate = () => {
+    if (pendingUpdate) dismissedVersionRef.current = pendingUpdate.version;
     setPendingUpdate(null);
     setUpdateStatus({ state: "idle" });
   };
