@@ -3,10 +3,16 @@ import { useEffect, useRef, useState } from "react";
 interface Props {
   onOpenSettings: () => void;
   onOpenChangelog: () => void;
+  onCheckForUpdates: () => void;
   onQuit: () => void;
 }
 
-export function Menubar({ onOpenSettings, onOpenChangelog, onQuit }: Props) {
+export function Menubar({
+  onOpenSettings,
+  onOpenChangelog,
+  onCheckForUpdates,
+  onQuit,
+}: Props) {
   const [openMenu, setOpenMenu] = useState<null | "main" | "help">(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -46,6 +52,16 @@ export function Menubar({ onOpenSettings, onOpenChangelog, onQuit }: Props) {
               }}
             >
               Ustawienia
+            </button>
+            <button
+              type="button"
+              className="gg-menu-item"
+              onClick={() => {
+                setOpenMenu(null);
+                onCheckForUpdates();
+              }}
+            >
+              Sprawdź aktualizacje
             </button>
             <div className="gg-menu-sep" />
             <button

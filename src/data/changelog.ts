@@ -12,6 +12,13 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.3",
+    date: "2026-05-09",
+    notes: [
+      "W dropdownie GAIdu GAIdu nowa pozycja „Sprawdź aktualizacje” — manualne sprawdzenie odświeża powiadomienie nawet jeśli wcześniej kliknąłeś „Później”, a przy braku nowej wersji pokazuje krótki komunikat „Masz najnowszą wersję”.",
+    ],
+  },
+  {
     version: "0.5.2",
     date: "2026-05-09",
     notes: [

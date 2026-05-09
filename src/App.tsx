@@ -101,8 +101,10 @@ export default function App() {
   >({});
   const [pendingUpdate, setPendingUpdate] = useState<PendingUpdate | null>(null);
   const [updateStatus, setUpdateStatus] = useState<DownloadStatus>({ state: "idle" });
+  const [updateNotice, setUpdateNotice] = useState<string | null>(null);
   const dismissedVersionRef = useRef<string | null>(null);
   const pendingUpdateRef = useRef<PendingUpdate | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
   const [activeModelId, setActiveModelId] = useState<string>(MODELS[0].id);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [activeSessionByModel, setActiveSessionByModel] = useState<Record<string, string | null>>(
@@ -170,6 +172,7 @@ export default function App() {
     return () => {
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
+      if (noticeTimerRef.current != null) window.clearTimeout(noticeTimerRef.current);
       abortRef.current?.abort();
     };
   }, []);
@@ -189,6 +192,29 @@ export default function App() {
     if (pendingUpdate) dismissedVersionRef.current = pendingUpdate.version;
     setPendingUpdate(null);
     setUpdateStatus({ state: "idle" });
+  };
+
+  const showNotice = (msg: string) => {
+    setUpdateNotice(msg);
+    if (noticeTimerRef.current != null) window.clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = window.setTimeout(() => setUpdateNotice(null), 4000);
+  };
+
+  const onCheckForUpdates = async () => {
+    showNotice("Sprawdzam aktualizacje…");
+    const pending = await checkForUpdate();
+    if (pending) {
+      // Manualne sprawdzenie kasuje dismissed flag — user wprost prosi o pokazanie.
+      dismissedVersionRef.current = null;
+      setPendingUpdate(pending);
+      setUpdateNotice(null);
+      if (noticeTimerRef.current != null) {
+        window.clearTimeout(noticeTimerRef.current);
+        noticeTimerRef.current = null;
+      }
+    } else {
+      showNotice("Masz najnowszą wersję.");
+    }
   };
 
   const switchActiveSession = async (modelId: string, sessionId: string | null) => {
@@ -461,6 +487,7 @@ export default function App() {
       <Menubar
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenChangelog={() => setChangelogOpen(true)}
+        onCheckForUpdates={onCheckForUpdates}
         onQuit={onQuit}
       />
       <Toolbar
@@ -527,6 +554,11 @@ export default function App() {
           onInstall={onInstallUpdate}
           onDismiss={onDismissUpdate}
         />
+      )}
+      {updateNotice && !pendingUpdate && (
+        <div className="gg-update-notice" role="status">
+          {updateNotice}
+        </div>
       )}
     </div>
   );

@@ -1645,3 +1645,18 @@ input, textarea {
 .gg-statusbar-version {
   font-family: inherit;
 }
+
+/* Maly informacyjny toast (np. "masz najnowszą wersję") */
+.gg-update-notice {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  padding: 8px 12px;
+  background: var(--xp-face);
+  border: 1px solid var(--xp-blue-deep);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  font: 11px var(--font-ui);
+  color: var(--text);
+  z-index: 1000;
+  animation: gg-update-toast-slide 200ms ease-out;
+}
