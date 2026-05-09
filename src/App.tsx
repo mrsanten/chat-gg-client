@@ -11,6 +11,7 @@ import { MODELS } from "./data/models";
 import { checkConfigured, streamChat, welcomeText, ProviderError } from "./lib/providers";
 import { playNotify } from "./lib/sound";
 import { loadSettings } from "./lib/settings";
+import { runUpdateFlow } from "./lib/updater";
 import {
   deleteSession as deleteSessionRpc,
   deriveTitle,
@@ -114,6 +115,11 @@ export default function App() {
       setSettings(s);
       setSessions(sess);
     })();
+    // Sprawdź aktualizacje w tle przy starcie. Błędy logujemy, nie blokujemy UI.
+    runUpdateFlow((status) => {
+      if (status.state === "error") console.warn("[updater]", status.message);
+      else console.info("[updater]", status);
+    });
     return () => abortRef.current?.abort();
   }, []);
 

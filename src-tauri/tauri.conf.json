@@ -30,6 +30,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,5 +38,17 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/mrsanten/chat-gg-client/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQyNTU4QTMyQjMwNEZDOApSV1RJVHpBcm8xZ2xCRWx0Ykt5UVVCTWhaMGFKdTB0UlMvRGJDbmMyK1MyQytIWnM3ZTBxVHhQbQo=",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
