@@ -47,6 +47,25 @@ pub enum ClientEvent {
     },
     /// Klient potwierdza odebranie wiadomości (do oznaczenia delivered_at).
     AckDelivery { message_id: Uuid },
+    /// Klient potwierdza odebranie zaszyfrowanego bloba (MLS application msg).
+    AckBlob { blob_id: Uuid },
+    /// Klient potwierdza odebranie Welcome (= zjoinowanie grupy MLS).
+    AckWelcome { welcome_id: Uuid },
+    /// Wyślij zaszyfrowany Application Message MLS do peera. group_id+epoch
+    /// trzymane plain (do routingu i detekcji desync); ciphertext nieprzezroczysty.
+    SendBlob {
+        to: String,
+        group_id: String, // base64
+        epoch: i64,
+        ciphertext: String, // base64 (MLS PrivateMessage)
+        #[serde(default)]
+        client_msg_id: Option<String>,
+    },
+    /// Wyślij Welcome do nowego członka grupy (zwykle pierwsza interakcja).
+    SendWelcome {
+        to: String,
+        ciphertext: String, // base64 (MLS Welcome)
+    },
     /// Pingi heartbeat (klient może wysyłać co 30s).
     Ping,
 }
@@ -89,6 +108,29 @@ pub enum ServerEvent {
     Presence {
         username: String,
         online: bool,
+    },
+    /// Zaszyfrowana wiadomość MLS przyszła do tego usera.
+    Blob {
+        id: Uuid,
+        from: String,
+        group_id: String,    // base64
+        epoch: i64,
+        ciphertext: String,  // base64
+        created_at: DateTime<Utc>,
+    },
+    /// Echo nadawcy bloba — analog Sent dla MLS.
+    SentBlob {
+        id: Uuid,
+        client_msg_id: Option<String>,
+        to: String,
+        created_at: DateTime<Utc>,
+    },
+    /// Welcome do nowej grupy MLS przyszło.
+    Welcome {
+        id: Uuid,
+        from: String,
+        ciphertext: String,  // base64
+        created_at: DateTime<Utc>,
     },
     /// Pong na ping.
     Pong,
@@ -274,6 +316,34 @@ async fn handle_client_event(
                 tracing::warn!("ack_delivery update: {e:?}");
             }
         }
+        ClientEvent::AckBlob { blob_id } => {
+            if let Err(e) = sqlx::query(
+                r#"UPDATE message_blobs
+                   SET delivered_at = now()
+                   WHERE id = $1 AND recipient_id = $2 AND delivered_at IS NULL"#,
+            )
+            .bind(blob_id)
+            .bind(sender_id)
+            .execute(&state.db)
+            .await
+            {
+                tracing::warn!("ack_blob update: {e:?}");
+            }
+        }
+        ClientEvent::AckWelcome { welcome_id } => {
+            if let Err(e) = sqlx::query(
+                r#"UPDATE welcomes
+                   SET delivered_at = now()
+                   WHERE id = $1 AND recipient_id = $2 AND delivered_at IS NULL"#,
+            )
+            .bind(welcome_id)
+            .bind(sender_id)
+            .execute(&state.db)
+            .await
+            {
+                tracing::warn!("ack_welcome update: {e:?}");
+            }
+        }
         ClientEvent::Typing { to, state: ts } => {
             // Resolve peer id z usernamea. Jeśli go nie ma — milcząco ignoruj.
             let peer_lower = to.to_lowercase();
@@ -295,6 +365,238 @@ async fn handle_client_event(
                         },
                     )
                     .await;
+            }
+        }
+        ClientEvent::SendBlob {
+            to,
+            group_id,
+            epoch,
+            ciphertext,
+            client_msg_id,
+        } => {
+            use base64::{engine::general_purpose::STANDARD as B64, Engine};
+            let group_bytes = match B64.decode(&group_id) {
+                Ok(b) => b,
+                Err(_) => {
+                    let _ = tx
+                        .send(ServerEvent::Error {
+                            code: "bad_group_id".into(),
+                            message: "group_id musi być base64".into(),
+                        })
+                        .await;
+                    return;
+                }
+            };
+            let cipher_bytes = match B64.decode(&ciphertext) {
+                Ok(b) => b,
+                Err(_) => {
+                    let _ = tx
+                        .send(ServerEvent::Error {
+                            code: "bad_ciphertext".into(),
+                            message: "ciphertext musi być base64".into(),
+                        })
+                        .await;
+                    return;
+                }
+            };
+            if cipher_bytes.len() > 256 * 1024 {
+                let _ = tx
+                    .send(ServerEvent::Error {
+                        code: "blob_too_large".into(),
+                        message: "ciphertext > 256 KiB".into(),
+                    })
+                    .await;
+                return;
+            }
+            let peer_lower = to.to_lowercase();
+            let peer: Option<(Uuid, String)> = sqlx::query_as(
+                r#"SELECT id, username FROM accounts WHERE username_lower = $1"#,
+            )
+            .bind(&peer_lower)
+            .fetch_optional(&state.db)
+            .await
+            .ok()
+            .flatten();
+            let Some((peer_id, peer_username)) = peer else {
+                let _ = tx
+                    .send(ServerEvent::Error {
+                        code: "peer_not_found".into(),
+                        message: format!("user '{to}' nie istnieje"),
+                    })
+                    .await;
+                return;
+            };
+            if peer_id == sender_id {
+                let _ = tx
+                    .send(ServerEvent::Error {
+                        code: "self_send".into(),
+                        message: "nie można wysłać do siebie".into(),
+                    })
+                    .await;
+                return;
+            }
+
+            let inserted: Result<(Uuid, DateTime<Utc>), sqlx::Error> = sqlx::query_as(
+                r#"
+                INSERT INTO message_blobs (sender_id, recipient_id, group_id, epoch, ciphertext)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id, created_at
+                "#,
+            )
+            .bind(sender_id)
+            .bind(peer_id)
+            .bind(&group_bytes)
+            .bind(epoch)
+            .bind(&cipher_bytes)
+            .fetch_one(&state.db)
+            .await;
+            let (blob_id, created_at) = match inserted {
+                Ok(x) => x,
+                Err(e) => {
+                    tracing::error!("insert blob: {e:?}");
+                    let _ = tx
+                        .send(ServerEvent::Error {
+                            code: "db".into(),
+                            message: "nie udało się zapisać bloba".into(),
+                        })
+                        .await;
+                    return;
+                }
+            };
+
+            // Echo nadawcy.
+            state
+                .hub
+                .send_to(
+                    sender_id,
+                    ServerEvent::SentBlob {
+                        id: blob_id,
+                        client_msg_id: client_msg_id.clone(),
+                        to: peer_username,
+                        created_at,
+                    },
+                )
+                .await;
+
+            // Doręczenie peerowi (jeśli online). Offline trafi przy reconnect.
+            if state.hub.is_online(peer_id).await {
+                state
+                    .hub
+                    .send_to(
+                        peer_id,
+                        ServerEvent::Blob {
+                            id: blob_id,
+                            from: sender_username.to_string(),
+                            group_id,
+                            epoch,
+                            ciphertext,
+                            created_at,
+                        },
+                    )
+                    .await;
+                let _ = sqlx::query(
+                    r#"UPDATE message_blobs SET delivered_at = now()
+                       WHERE id = $1 AND delivered_at IS NULL"#,
+                )
+                .bind(blob_id)
+                .execute(&state.db)
+                .await;
+            }
+        }
+        ClientEvent::SendWelcome { to, ciphertext } => {
+            use base64::{engine::general_purpose::STANDARD as B64, Engine};
+            let cipher_bytes = match B64.decode(&ciphertext) {
+                Ok(b) => b,
+                Err(_) => {
+                    let _ = tx
+                        .send(ServerEvent::Error {
+                            code: "bad_ciphertext".into(),
+                            message: "ciphertext musi być base64".into(),
+                        })
+                        .await;
+                    return;
+                }
+            };
+            if cipher_bytes.len() > 256 * 1024 {
+                let _ = tx
+                    .send(ServerEvent::Error {
+                        code: "welcome_too_large".into(),
+                        message: "Welcome > 256 KiB".into(),
+                    })
+                    .await;
+                return;
+            }
+            let peer_lower = to.to_lowercase();
+            let peer_id: Option<Uuid> =
+                sqlx::query_scalar(r#"SELECT id FROM accounts WHERE username_lower = $1"#)
+                    .bind(&peer_lower)
+                    .fetch_optional(&state.db)
+                    .await
+                    .ok()
+                    .flatten();
+            let Some(peer_id) = peer_id else {
+                let _ = tx
+                    .send(ServerEvent::Error {
+                        code: "peer_not_found".into(),
+                        message: format!("user '{to}' nie istnieje"),
+                    })
+                    .await;
+                return;
+            };
+            if peer_id == sender_id {
+                let _ = tx
+                    .send(ServerEvent::Error {
+                        code: "self_welcome".into(),
+                        message: "nie można wysłać Welcome do siebie".into(),
+                    })
+                    .await;
+                return;
+            }
+            let inserted: Result<(Uuid, DateTime<Utc>), sqlx::Error> = sqlx::query_as(
+                r#"
+                INSERT INTO welcomes (recipient_id, sender_id, ciphertext)
+                VALUES ($1, $2, $3)
+                RETURNING id, created_at
+                "#,
+            )
+            .bind(peer_id)
+            .bind(sender_id)
+            .bind(&cipher_bytes)
+            .fetch_one(&state.db)
+            .await;
+            let (welcome_id, created_at) = match inserted {
+                Ok(x) => x,
+                Err(e) => {
+                    tracing::error!("insert welcome: {e:?}");
+                    let _ = tx
+                        .send(ServerEvent::Error {
+                            code: "db".into(),
+                            message: "nie udało się zapisać Welcome".into(),
+                        })
+                        .await;
+                    return;
+                }
+            };
+            if state.hub.is_online(peer_id).await {
+                state
+                    .hub
+                    .send_to(
+                        peer_id,
+                        ServerEvent::Welcome {
+                            id: welcome_id,
+                            from: sender_username.to_string(),
+                            ciphertext,
+                            created_at,
+                        },
+                    )
+                    .await;
+                let _ = sqlx::query(
+                    r#"UPDATE welcomes SET delivered_at = now()
+                       WHERE id = $1 AND delivered_at IS NULL"#,
+                )
+                .bind(welcome_id)
+                .execute(&state.db)
+                .await;
             }
         }
         ClientEvent::Send {
@@ -425,7 +727,82 @@ async fn flush_offline_queue(
     account_id: Uuid,
     tx: &mpsc::Sender<ServerEvent>,
 ) -> anyhow::Result<()> {
-    // FIFO: oldest first.
+    use base64::{engine::general_purpose::STANDARD as B64, Engine};
+
+    // 1) Welcomes — najpierw, bo bez Welcome nie da się rozszyfrować bloba.
+    let welcomes: Vec<(Uuid, String, Vec<u8>, DateTime<Utc>)> = sqlx::query_as(
+        r#"
+        SELECT w.id, a.username, w.ciphertext, w.created_at
+        FROM welcomes w
+        JOIN accounts a ON a.id = w.sender_id
+        WHERE w.recipient_id = $1 AND w.delivered_at IS NULL
+        ORDER BY w.created_at ASC
+        "#,
+    )
+    .bind(account_id)
+    .fetch_all(&state.db)
+    .await?;
+    for (id, from, ciphertext, created_at) in welcomes {
+        if tx
+            .send(ServerEvent::Welcome {
+                id,
+                from,
+                ciphertext: B64.encode(&ciphertext),
+                created_at,
+            })
+            .await
+            .is_err()
+        {
+            return Ok(());
+        }
+        let _ = sqlx::query(
+            r#"UPDATE welcomes SET delivered_at = now()
+               WHERE id = $1 AND delivered_at IS NULL"#,
+        )
+        .bind(id)
+        .execute(&state.db)
+        .await;
+    }
+
+    // 2) Zaszyfrowane blob-y MLS — kolejność po created_at, klient sobie
+    // dopasuje per-grupa po (group_id, epoch).
+    let blobs: Vec<(Uuid, String, Vec<u8>, i64, Vec<u8>, DateTime<Utc>)> = sqlx::query_as(
+        r#"
+        SELECT mb.id, a.username, mb.group_id, mb.epoch, mb.ciphertext, mb.created_at
+        FROM message_blobs mb
+        JOIN accounts a ON a.id = mb.sender_id
+        WHERE mb.recipient_id = $1 AND mb.delivered_at IS NULL
+        ORDER BY mb.created_at ASC
+        "#,
+    )
+    .bind(account_id)
+    .fetch_all(&state.db)
+    .await?;
+    for (id, from, group_id, epoch, ciphertext, created_at) in blobs {
+        if tx
+            .send(ServerEvent::Blob {
+                id,
+                from,
+                group_id: B64.encode(&group_id),
+                epoch,
+                ciphertext: B64.encode(&ciphertext),
+                created_at,
+            })
+            .await
+            .is_err()
+        {
+            return Ok(());
+        }
+        let _ = sqlx::query(
+            r#"UPDATE message_blobs SET delivered_at = now()
+               WHERE id = $1 AND delivered_at IS NULL"#,
+        )
+        .bind(id)
+        .execute(&state.db)
+        .await;
+    }
+
+    // 3) Plain text messages (legacy z phase 2 — zostają dla starych konwersacji).
     let rows: Vec<(Uuid, String, String, DateTime<Utc>)> = sqlx::query_as(
         r#"
         SELECT m.id, a.username, m.body, m.created_at
@@ -440,7 +817,6 @@ async fn flush_offline_queue(
     .await?;
 
     for (id, from, body, created_at) in rows {
-        // Jeśli send nie powiedzie się (klient się rozłączył), kończymy.
         if tx
             .send(ServerEvent::Message {
                 id,
@@ -453,9 +829,6 @@ async fn flush_offline_queue(
         {
             break;
         }
-        // Oznaczamy delivered. Klient i tak ack'nie własnym frame'em,
-        // ale my chcemy zapobiec dwukrotnemu wypchnięciu jeśli zaraz po
-        // tym przyjdzie reconnect.
         let _ = sqlx::query(
             r#"UPDATE messages SET delivered_at = now() WHERE id = $1 AND delivered_at IS NULL"#,
         )

@@ -4,6 +4,7 @@ mod contacts;
 mod error;
 mod history;
 mod hub;
+mod key_packages;
 mod state;
 mod ws;
 
@@ -51,6 +52,9 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/contacts/{peer_id}", axum::routing::delete(contacts::remove_contact))
         .route("/history", get(history::history))
+        .route("/key-packages", post(key_packages::publish))
+        .route("/key-packages/_count", get(key_packages::my_count))
+        .route("/key-packages/{username}", get(key_packages::claim))
         .route("/ws", get(ws::ws_handler))
         .with_state(state)
         .layer(TraceLayer::new_for_http())
