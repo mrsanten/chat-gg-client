@@ -137,11 +137,13 @@ export function Sidebar(props: Props) {
       </Section>
 
       <div className="gg-sidebar-footer">
-        <div className="gg-sidebar-footer-brand">
-          <img src={sunIcon} alt="" />
-          <span>GAIdu GAIdu</span>
-        </div>
-        <div className="gg-sidebar-footer-tags">czat • muzyka • gry</div>
+        <a className="gg-sidebar-ad" href="#" onClick={(e) => e.preventDefault()}>
+          <span className="gg-sidebar-ad-label">Reklama</span>
+          <div className="gg-sidebar-ad-row">
+            <img className="gg-sidebar-ad-img" src="/larry.webp" alt="Larry" />
+            <span className="gg-sidebar-ad-text">A czy ty zjadłeś japuszko? Larry patrzy!</span>
+          </div>
+        </a>
       </div>
     </aside>
   );

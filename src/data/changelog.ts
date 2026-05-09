@@ -12,6 +12,13 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.5.4",
+    date: "2026-05-09",
+    notes: [
+      'W stopce panelu bocznego pojawia się sekcja reklamowa: grafika Larry\'ego po lewej, tekst po prawej („A czy ty zjadłeś japuszko? Larry patrzy!").',
+    ],
+  },
+  {
     version: "0.5.3",
     date: "2026-05-09",
     notes: [
