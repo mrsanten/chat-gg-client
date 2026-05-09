@@ -3125,6 +3125,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a52c927ddb9940acb96d51aebd54b8b9c601c7119e6609622fb3f2cbe16abe3"
 dependencies = [
+ "base64 0.22.1",
  "log",
  "openmls_traits",
  "serde",
@@ -4822,9 +4823,11 @@ name = "tauri-app"
 version = "0.7.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "futures-util",
  "openmls",
  "openmls_basic_credential",
+ "openmls_memory_storage",
  "openmls_rust_crypto",
  "openmls_traits",
  "reqwest 0.12.28",
@@ -4835,6 +4838,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-process",
  "tauri-plugin-updater",
+ "tempfile",
  "thiserror 2.0.18",
  "tls_codec",
  "tokio",

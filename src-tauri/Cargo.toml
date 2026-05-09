@@ -25,12 +25,13 @@ tokio = { version = "1", features = ["macros", "io-util", "process", "rt-multi-t
 anyhow = "1"
 thiserror = "2"
 
-[dev-dependencies]
-# Phase 3 PoC (E2E via MLS — RFC 9420). Trzymamy w dev-dependencies, bo
-# crate jest tylko w testach (`mls::tests::*`) — nie chcemy spuchnąć
-# release binarki przed wpięciem MLS-a w runtime (phase 3C+).
+# Phase 3C+: MLS w runtime. Storage persystowany do plików JSON w
+# app_local_data_dir.
 openmls = "0.8"
 openmls_rust_crypto = "0.5"
 openmls_basic_credential = "0.5"
 openmls_traits = "0.5"
+openmls_memory_storage = { version = "0.5", features = ["persistence"] }
+tempfile = "3"
 tls_codec = { version = "0.4", features = ["std", "derive"] }
+base64 = "0.22"

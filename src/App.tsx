@@ -16,6 +16,7 @@ import { AddFriendDialog } from "./components/AddFriendDialog";
 import * as serverApi from "./lib/serverApi";
 import type { ServerContact, ServerMessage } from "./lib/serverApi";
 import { NetworkClient, type ConnectionStatus, type ServerEvent as NetEvent } from "./lib/network";
+import { mlsInit, mlsGenerateKeyPackages } from "./lib/mls";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MODELS } from "./data/models";
 import { checkConfigured, streamChat, welcomeText, ProviderError } from "./lib/providers";
@@ -163,9 +164,10 @@ export default function App() {
       // formularz logowania zamiast „już zalogowany".
       if (s.network?.token && s.network.server_url) {
         try {
-          await serverApi.me(s.network.server_url, s.network.token);
-          // Token OK → załaduj listę znajomych.
+          const me = await serverApi.me(s.network.server_url, s.network.token);
+          // Token OK → załaduj listę znajomych + zapewnij MLS identity.
           void refreshContacts(s.network.server_url, s.network.token);
+          void ensureMlsReady(s.network.server_url, s.network.token, me.id);
         } catch (e) {
           if (e instanceof serverApi.ServerError && e.status === 401) {
             console.warn("[network] zapisany token jest nieważny, czyszczę");
@@ -330,6 +332,9 @@ export default function App() {
       setActivePeerUsername(null);
     } else {
       void refreshContacts(s.network.server_url, s.network.token);
+      if (s.network.account_id) {
+        void ensureMlsReady(s.network.server_url, s.network.token, s.network.account_id);
+      }
     }
   };
 
@@ -339,6 +344,40 @@ export default function App() {
       setContacts(list);
     } catch (e) {
       console.warn("[network] listContacts failed:", e);
+    }
+  };
+
+  /**
+   * Inicjalizuje MLS (klucz podpisujący) i upewnia się, że na serwerze
+   * leży co najmniej `MIN_KP` KeyPackage'ów. Jeśli nie — generuje
+   * `BATCH_KP` świeżych i publikuje. Idempotentne, można wołać po loginie
+   * i przy każdym starcie z istniejącym tokenem.
+   */
+  const ensureMlsReady = async (
+    serverUrl: string,
+    token: string,
+    accountId: string,
+  ) => {
+    const MIN_KP = 3;
+    const BATCH_KP = 10;
+    try {
+      const identity = await mlsInit(accountId);
+      if (identity.freshly_created) {
+        console.info("[mls] nowa tożsamość MLS dla", accountId);
+      }
+      const { unconsumed } = await serverApi.keyPackagesCount(serverUrl, token);
+      if (unconsumed < MIN_KP) {
+        const need = BATCH_KP;
+        const fresh = await mlsGenerateKeyPackages(accountId, need);
+        const resp = await serverApi.publishKeyPackages(serverUrl, token, fresh);
+        console.info(
+          "[mls] uzupełniłem KP: +%d, total na serwerze: %d",
+          resp.stored,
+          resp.total_unconsumed,
+        );
+      }
+    } catch (e) {
+      console.warn("[mls] init/keypackage flow nie udał się:", e);
     }
   };
 

@@ -1,5 +1,4 @@
 mod chat;
-#[cfg(test)]
 mod mls;
 mod sessions;
 mod settings;
@@ -18,6 +17,8 @@ pub fn run() {
             sessions::load_session,
             sessions::save_session,
             sessions::delete_session,
+            mls::mls_init,
+            mls::mls_generate_key_packages,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

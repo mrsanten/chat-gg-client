@@ -161,6 +161,57 @@ export async function fetchHistory(
   return request<ServerMessage[]>("GET", serverUrl, `/history?${params}`, { token });
 }
 
+// ─────────────────────────────────── KeyPackages (MLS, phase 3)
+
+export interface KeyPackagesPublishResp {
+  stored: number;
+  total_unconsumed: number;
+}
+
+export interface KeyPackagesCountResp {
+  unconsumed: number;
+}
+
+export interface KeyPackageClaim {
+  id: string;
+  username: string;
+  data: string; // base64
+}
+
+/** Publikuje listę KeyPackage'ów (każdy w base64). Server odda je peerom. */
+export async function publishKeyPackages(
+  serverUrl: string,
+  token: string,
+  packages: string[],
+): Promise<KeyPackagesPublishResp> {
+  return request<KeyPackagesPublishResp>("POST", serverUrl, "/key-packages", {
+    token,
+    body: { packages },
+  });
+}
+
+/** Ile własnych KP nie zostało jeszcze zużytych przez peerów. */
+export async function keyPackagesCount(
+  serverUrl: string,
+  token: string,
+): Promise<KeyPackagesCountResp> {
+  return request<KeyPackagesCountResp>("GET", serverUrl, "/key-packages/_count", { token });
+}
+
+/** Pobiera (i konsumuje) jeden KP wskazanego peera. 404 = peer nie istnieje, 409 = pusto. */
+export async function claimKeyPackage(
+  serverUrl: string,
+  token: string,
+  username: string,
+): Promise<KeyPackageClaim> {
+  return request<KeyPackageClaim>(
+    "GET",
+    serverUrl,
+    `/key-packages/${encodeURIComponent(username)}`,
+    { token },
+  );
+}
+
 export async function healthz(serverUrl: string): Promise<boolean> {
   try {
     await request<{ ok: boolean }>("GET", serverUrl, "/healthz");
