@@ -25,7 +25,8 @@ type RustRequest =
   | { kind: "anthropic"; model: string }
   | { kind: "open_ai"; model: string }
   | { kind: "moonshot"; model: string }
-  | { kind: "claude_code"; model: string };
+  | { kind: "claude_code"; model: string }
+  | { kind: "codex"; model: string };
 
 function buildRequest(model: ToolModel, settings: Settings): RustRequest {
   if (model.provider === "anthropic") {
@@ -35,6 +36,9 @@ function buildRequest(model: ToolModel, settings: Settings): RustRequest {
     return { kind: "anthropic", model: model.apiModelId };
   }
   if (model.provider === "openai") {
+    if (settings.openai.auth.mode === "codex") {
+      return { kind: "codex", model: model.apiModelId };
+    }
     return { kind: "open_ai", model: model.apiModelId };
   }
   if (model.provider === "moonshot") {
@@ -52,7 +56,9 @@ function isProviderConfigured(provider: Provider, settings: Settings): boolean {
   }
   if (provider === "openai") {
     const o = settings.openai.auth;
-    return o.mode === "api_key" && o.api_key.trim().length > 0;
+    if (o.mode === "api_key") return o.api_key.trim().length > 0;
+    if (o.mode === "codex") return true;
+    return false;
   }
   if (provider === "moonshot") {
     const k = settings.moonshot.auth;
@@ -71,7 +77,7 @@ export function checkConfigured(model: ToolModel, settings: Settings): string | 
       return "Anthropic nie skonfigurowane. Otwórz Ustawienia (toolbar → Ustawienia) i podaj klucz API albo wybierz tryb subskrypcji Claude Code.";
     }
     if (model.provider === "openai") {
-      return "OpenAI nie skonfigurowane. Otwórz Ustawienia (toolbar → Ustawienia) i podaj klucz API.";
+      return "OpenAI nie skonfigurowane. Otwórz Ustawienia i podaj klucz API albo wybierz tryb subskrypcji Codex CLI.";
     }
     return "Moonshot (Kimi) nie skonfigurowane. Otwórz Ustawienia i wklej klucz API z platform.moonshot.ai.";
   }

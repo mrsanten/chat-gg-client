@@ -49,6 +49,7 @@ impl Default for AnthropicAuth {
 pub enum OpenAiAuth {
     None,
     ApiKey { api_key: String },
+    Codex { binary_path: Option<String> },
 }
 
 impl Default for OpenAiAuth {

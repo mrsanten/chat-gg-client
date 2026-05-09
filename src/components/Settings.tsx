@@ -44,7 +44,7 @@ export function SettingsDialog({ open, onClose, onSaved }: Props) {
     }));
   };
 
-  const setOaiMode = (mode: "none" | "api_key") => {
+  const setOaiMode = (mode: "none" | "api_key" | "codex") => {
     setSettings((s) => ({
       ...s,
       openai: {
@@ -52,7 +52,9 @@ export function SettingsDialog({ open, onClose, onSaved }: Props) {
         auth:
           mode === "api_key"
             ? { mode: "api_key", api_key: s.openai.auth.mode === "api_key" ? s.openai.auth.api_key : "" }
-            : { mode: "none" },
+            : mode === "codex"
+              ? { mode: "codex", binary_path: s.openai.auth.mode === "codex" ? s.openai.auth.binary_path : null }
+              : { mode: "none" },
       },
     }));
   };
@@ -217,9 +219,43 @@ export function SettingsDialog({ open, onClose, onSaved }: Props) {
                     </button>
                   </div>
                 )}
-                <p className="gg-hint">
-                  Subskrypcja ChatGPT Plus/Pro nie udostępnia oficjalnego API. Aby używać GPT, potrzebujesz osobnego klucza API z platform.openai.com (rozliczany niezależnie).
-                </p>
+                <label className="gg-radio">
+                  <input
+                    type="radio"
+                    checked={o.mode === "codex"}
+                    onChange={() => setOaiMode("codex")}
+                  />
+                  Subskrypcja (Codex CLI, używa Twojego loginu ChatGPT Plus/Pro/Business)
+                </label>
+                {o.mode === "codex" && (
+                  <>
+                    <div className="gg-field">
+                      <input
+                        type="text"
+                        className="gg-text-input"
+                        placeholder="codex (lub pełna ścieżka, np. /usr/local/bin/codex)"
+                        value={o.binary_path ?? ""}
+                        onChange={(e) =>
+                          setSettings((s) => ({
+                            ...s,
+                            openai: {
+                              ...s.openai,
+                              auth: { mode: "codex", binary_path: e.target.value || null },
+                            },
+                          }))
+                        }
+                      />
+                    </div>
+                    <p className="gg-hint">
+                      Wymaga zainstalowanego Codex CLI (`npm i -g @openai/codex`) i zalogowania (`codex login` otworzy ChatGPT w przeglądarce). Apka shelluje do binarki w trybie `codex exec --json`. Klucz API z platform.openai.com nie jest potrzebny.
+                    </p>
+                  </>
+                )}
+                {o.mode !== "codex" && (
+                  <p className="gg-hint">
+                    Subskrypcja ChatGPT Plus/Pro nie udostępnia oficjalnego API. Aby używać GPT bez subskrypcji, potrzebujesz osobnego klucza API z platform.openai.com (rozliczany niezależnie). Jeśli masz aktywne ChatGPT Plus/Pro, użyj trybu „Subskrypcja (Codex CLI)" poniżej.
+                  </p>
+                )}
               </fieldset>
 
               <fieldset className="gg-fieldset">

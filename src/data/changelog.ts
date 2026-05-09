@@ -12,6 +12,15 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.6.0",
+    date: "2026-05-09",
+    notes: [
+      'OpenAI: nowy tryb logowania „Subskrypcja (Codex CLI)". Używa Twojego konta ChatGPT Plus/Pro/Business przez oficjalne CLI OpenAI (`@openai/codex`). Apka nie potrzebuje już osobnego klucza API z platform.openai.com, jeśli masz aktywną subskrypcję ChatGPT.',
+      'Konfiguracja: 1) `npm i -g @openai/codex`, 2) `codex login` (otworzy ChatGPT w przeglądarce, jednorazowo), 3) Ustawienia → OpenAI → „Subskrypcja (Codex CLI)" → Zapisz.',
+      'Tryb subskrypcji nie obsługuje wysyłania obrazków — do obrazków trzeba przełączyć na „API key (platform.openai.com)".',
+    ],
+  },
+  {
     version: "0.5.5",
     date: "2026-05-09",
     notes: [

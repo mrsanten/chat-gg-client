@@ -75,6 +75,7 @@ pub enum ChatProviderRequest {
     OpenAi { model: String },
     Moonshot { model: String },
     ClaudeCode { model: String },
+    Codex { model: String },
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -328,6 +329,174 @@ async fn run_claude_code(
     Ok(())
 }
 
+/// Subskrypcja ChatGPT przez OpenAI Codex CLI.
+///
+/// Wymaga zainstalowanego `codex` (`npm i -g @openai/codex`) i zalogowania
+/// (`codex login`, otwiera browser do ChatGPT). Po loginie sesja jest
+/// zapisana w `~/.codex/`.
+///
+/// Używamy trybu `codex exec --json`, który drukuje JSONL ze zdarzeniami.
+/// Parser jest defensywny: akceptuje kilka wariantów nazw pól, bo Codex CLI
+/// wciąż zmienia API.
+async fn run_codex(
+    binary_path: Option<&str>,
+    model: &str,
+    history: Vec<ChatMessageDto>,
+    channel: Channel<StreamEvent>,
+) -> anyhow::Result<()> {
+    let bin = binary_path.unwrap_or("codex");
+
+    let last_user = history
+        .iter()
+        .rev()
+        .find(|m| m.role == "user")
+        .ok_or_else(|| anyhow::anyhow!("no user message"))?;
+
+    if !last_user.images.is_empty() {
+        anyhow::bail!(
+            "Tryb subskrypcji (Codex CLI) nie obsługuje obrazków w tej apce. Przełącz OpenAI na 'API key' w Ustawieniach żeby wysyłać obrazki."
+        );
+    }
+
+    let mut cmd = Command::new(bin);
+    cmd.arg("exec")
+        .arg("--json")
+        .arg("--skip-git-repo-check")
+        .arg("--model")
+        .arg(model)
+        .arg(&last_user.content)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = cmd.spawn().map_err(|e| {
+        anyhow::anyhow!(
+            "nie udało się uruchomić '{}': {}. Czy Codex CLI jest zainstalowane (`npm i -g @openai/codex`) i w PATH?",
+            bin,
+            e
+        )
+    })?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("brak stdout"))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("brak stderr"))?;
+
+    let mut reader = tokio::io::BufReader::new(stdout).lines();
+
+    let mut got_delta = false;
+    let mut final_assistant_text: Option<String> = None;
+    let mut saw_json = false;
+
+    while let Some(line) = reader.next_line().await? {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(trimmed) else {
+            // Niejson — w starszych wersjach Codex CLI exec drukuje czysty
+            // tekst odpowiedzi. Traktujemy całą linię jako część finalnego
+            // tekstu, jeśli nie widzieliśmy jeszcze żadnego JSON-a.
+            if !saw_json {
+                final_assistant_text
+                    .get_or_insert_with(String::new)
+                    .push_str(trimmed);
+                final_assistant_text.as_mut().unwrap().push('\n');
+            }
+            continue;
+        };
+        saw_json = true;
+
+        // Codex CLI zmienia nazwy w wydaniach. Próbujemy kilku wariantów.
+        let kind = v
+            .get("type")
+            .and_then(|t| t.as_str())
+            .or_else(|| v.get("msg").and_then(|m| m.get("type")).and_then(|t| t.as_str()))
+            .unwrap_or("");
+
+        // Lokalizacja payloadu: część wersji opakowuje w `msg`/`event`/`payload`.
+        let payload = v
+            .get("msg")
+            .or_else(|| v.get("event"))
+            .or_else(|| v.get("payload"))
+            .unwrap_or(&v);
+
+        match kind {
+            "agent_message_delta" | "message_delta" | "delta" => {
+                if let Some(text) = payload
+                    .get("delta")
+                    .and_then(|t| t.as_str())
+                    .or_else(|| payload.get("content").and_then(|t| t.as_str()))
+                    .or_else(|| payload.get("text").and_then(|t| t.as_str()))
+                {
+                    got_delta = true;
+                    let _ = channel.send(StreamEvent::Delta {
+                        text: text.to_string(),
+                    });
+                }
+            }
+            "agent_message" | "message" | "agent_response" => {
+                if let Some(text) = payload
+                    .get("message")
+                    .and_then(|t| t.as_str())
+                    .or_else(|| payload.get("content").and_then(|t| t.as_str()))
+                    .or_else(|| payload.get("text").and_then(|t| t.as_str()))
+                {
+                    final_assistant_text = Some(text.to_string());
+                }
+            }
+            "task_complete" | "task_finished" | "done" | "completed" => {
+                break;
+            }
+            "error" | "task_failed" => {
+                let msg = payload
+                    .get("message")
+                    .and_then(|t| t.as_str())
+                    .or_else(|| payload.get("error").and_then(|t| t.as_str()))
+                    .unwrap_or("nieznany błąd Codex CLI");
+                anyhow::bail!("codex error: {msg}");
+            }
+            _ => {}
+        }
+    }
+
+    if !got_delta {
+        if let Some(text) = final_assistant_text {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                let _ = channel.send(StreamEvent::Delta {
+                    text: trimmed.to_string(),
+                });
+            }
+        }
+    }
+
+    let status = child.wait().await?;
+    if !status.success() {
+        // Złap stderr, żeby przekazać sensowny błąd userowi.
+        let mut stderr_lines = tokio::io::BufReader::new(stderr).lines();
+        let mut err_buf = String::new();
+        while let Ok(Some(line)) = stderr_lines.next_line().await {
+            err_buf.push_str(&line);
+            err_buf.push('\n');
+            if err_buf.len() > 2048 {
+                break;
+            }
+        }
+        let trimmed = err_buf.trim();
+        let detail = if trimmed.is_empty() {
+            String::new()
+        } else {
+            format!(": {trimmed}")
+        };
+        anyhow::bail!("codex exited with status {status}{detail}");
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn chat_stream(
     app: AppHandle,
@@ -367,6 +536,9 @@ pub async fn chat_stream(
             OpenAiAuth::ApiKey { .. } => Err(anyhow::anyhow!(
                 "OpenAI API key jest pusty. Otwórz Ustawienia i wklej klucz."
             )),
+            OpenAiAuth::Codex { .. } => Err(anyhow::anyhow!(
+                "OpenAI ustawiony na Codex CLI: użyj kind=codex"
+            )),
             OpenAiAuth::None => Err(anyhow::anyhow!(
                 "Brak konfiguracji OpenAI. Otwórz Ustawienia."
             )),
@@ -390,6 +562,14 @@ pub async fn chat_stream(
             }
             _ => Err(anyhow::anyhow!(
                 "Tryb Claude Code nie jest aktywny. W Ustawieniach wybierz 'Subskrypcja (Claude Code)'."
+            )),
+        },
+        ChatProviderRequest::Codex { model } => match settings.openai.auth {
+            OpenAiAuth::Codex { binary_path } => {
+                run_codex(binary_path.as_deref(), &model, history, on_event.clone()).await
+            }
+            _ => Err(anyhow::anyhow!(
+                "Tryb Codex CLI nie jest aktywny. W Ustawieniach wybierz 'Subskrypcja (Codex CLI)'."
             )),
         },
     };

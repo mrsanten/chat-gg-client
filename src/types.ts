@@ -55,7 +55,8 @@ export type AnthropicAuth =
 
 export type OpenAiAuth =
   | { mode: "none" }
-  | { mode: "api_key"; api_key: string };
+  | { mode: "api_key"; api_key: string }
+  | { mode: "codex"; binary_path?: string | null };
 
 export type MoonshotAuth =
   | { mode: "none" }
