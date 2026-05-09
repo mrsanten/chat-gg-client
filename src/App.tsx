@@ -328,7 +328,7 @@ export default function App() {
 
   return (
     <div className="gg-window">
-      <Titlebar title="Gadu-Gadu 10" />
+      <Titlebar title="GAIdu GAIdu 10" />
       <Menubar />
       <Toolbar onOpenSettings={() => setSettingsOpen(true)} />
       <div className="gg-body">

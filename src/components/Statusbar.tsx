@@ -29,7 +29,6 @@ export function Statusbar() {
         </span>
       </div>
       <div className="gg-statusbar-spacer" />
-      <span className="gg-statusbar-link">www.gadu-gadu.pl</span>
     </div>
   );
 }

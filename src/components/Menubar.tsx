@@ -1,4 +1,4 @@
-const ITEMS = ["Gadu-Gadu", "Kontakty", "Sklep", "Usługi", "Pomoc"];
+const ITEMS = ["GAIdu GAIdu", "Kontakty", "Sklep", "Usługi", "Pomoc"];
 
 export function Menubar() {
   return (

@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Gadu-Gadu AI",
-  "version": "0.1.0",
-  "identifier": "com.mrellwart.gadugadu",
+  "productName": "GAIdu GAIdu",
+  "version": "0.2.0",
+  "identifier": "com.mrellwart.gaidugaidu",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Gadu-Gadu 10",
+        "title": "GAIdu GAIdu 10",
         "width": 1100,
         "height": 720,
         "minWidth": 900,

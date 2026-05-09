@@ -143,7 +143,7 @@ export function Sidebar(props: Props) {
       <div className="gg-sidebar-footer">
         <div className="gg-sidebar-footer-brand">
           <img src={sunIcon} alt="" />
-          <span>Gadu-Gadu<span className="pl">.pl</span></span>
+          <span>GAIdu GAIdu</span>
         </div>
         <div className="gg-sidebar-footer-tags">czat • muzyka • gry</div>
       </div>
