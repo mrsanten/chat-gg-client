@@ -1,20 +1,33 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import sunIcon from "../assets/sun.svg";
-import type { ImageAttachment } from "../types";
+import type { ImageAttachment, Macro } from "../types";
+import { applyMacro } from "../lib/macros";
 
 interface Props {
   disabled?: boolean;
   isStreaming?: boolean;
+  macros?: Macro[];
+  activeSessionMacroIds?: string[];
+  onToggleSessionMacro?: (id: string) => void;
   onSend: (text: string, images: ImageAttachment[]) => void;
   onStop?: () => void;
 }
 
 const MAX_IMAGES = 6;
 
-export function Composer({ disabled, isStreaming, onSend, onStop }: Props) {
+export function Composer({
+  disabled,
+  isStreaming,
+  macros,
+  activeSessionMacroIds,
+  onToggleSessionMacro,
+  onSend,
+  onStop,
+}: Props) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<ImageAttachment[]>([]);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const pendingCaretRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!disabled) ref.current?.focus();
@@ -28,6 +41,16 @@ export function Composer({ disabled, isStreaming, onSend, onStop }: Props) {
     const next = Math.min(el.scrollHeight, maxHeight);
     el.style.height = `${next}px`;
     el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
+    if (pendingCaretRef.current != null) {
+      const pos = pendingCaretRef.current;
+      pendingCaretRef.current = null;
+      el.focus();
+      try {
+        el.setSelectionRange(pos, pos);
+      } catch {
+        // ignore
+      }
+    }
   }, [text]);
 
   const submit = () => {
@@ -66,10 +89,68 @@ export function Composer({ disabled, isStreaming, onSend, onStop }: Props) {
     setImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const runMacro = (macro: Macro) => {
+    if (disabled) return;
+    const result = applyMacro(macro, text);
+    if (result.send) {
+      const carriedImages = images;
+      onSend(result.text, carriedImages);
+      setText("");
+      setImages([]);
+    } else {
+      pendingCaretRef.current = result.caret;
+      setText(result.text);
+    }
+  };
+
   const canSend = (text.trim().length > 0 || images.length > 0) && !disabled;
+
+  const actionMacros = (macros ?? []).filter((m) => (m.mode ?? "action") === "action");
+  const sessionMacros = (macros ?? []).filter((m) => m.mode === "session");
+  const activeSet = new Set(activeSessionMacroIds ?? []);
 
   return (
     <div className="gg-composer">
+      {(actionMacros.length > 0 || sessionMacros.length > 0) && (
+        <div className="gg-macro-bar" role="toolbar" aria-label="Makra">
+          {actionMacros.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="gg-macro-chip"
+              onClick={() => runMacro(m)}
+              disabled={disabled}
+              title={m.template}
+            >
+              <span className="gg-macro-chip-spark" aria-hidden>
+                ✦
+              </span>
+              <span className="gg-macro-chip-label">{m.name}</span>
+            </button>
+          ))}
+          {sessionMacros.length > 0 && actionMacros.length > 0 && (
+            <span className="gg-macro-bar-sep" aria-hidden />
+          )}
+          {sessionMacros.map((m) => {
+            const active = activeSet.has(m.id);
+            return (
+              <button
+                key={m.id}
+                type="button"
+                className={`gg-macro-toggle${active ? " is-active" : ""}`}
+                onClick={() => onToggleSessionMacro?.(m.id)}
+                title={`${active ? "Wyłącz" : "Włącz"} dla tej sesji:\n${m.template}`}
+                aria-pressed={active}
+              >
+                <span className="gg-macro-toggle-box" aria-hidden>
+                  {active ? "✓" : ""}
+                </span>
+                <span className="gg-macro-chip-label">{m.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       {images.length > 0 && (
         <div className="gg-composer-attachments">
           {images.map((img, idx) => (

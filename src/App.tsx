@@ -7,8 +7,10 @@ import { Conversation } from "./components/Conversation";
 import { Composer } from "./components/Composer";
 import { Statusbar } from "./components/Statusbar";
 import { SettingsDialog } from "./components/Settings";
+import { MacrosDialog } from "./components/MacrosDialog";
 import { MODELS } from "./data/models";
 import { checkConfigured, streamChat, welcomeText, ProviderError } from "./lib/providers";
+import { augmentForApi } from "./lib/macros";
 import { playNotify } from "./lib/sound";
 import { loadSettings } from "./lib/settings";
 import { runUpdateFlow } from "./lib/updater";
@@ -75,9 +77,15 @@ function messagesToStored(messages: ChatMessage[]): ChatSession["messages"] {
     }));
 }
 
+const PENDING_SESSION_KEY = "__pending__";
+
 export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [macrosOpen, setMacrosOpen] = useState(false);
+  const [sessionMacrosBySession, setSessionMacrosBySession] = useState<
+    Record<string, string[]>
+  >({});
   const [activeModelId, setActiveModelId] = useState<string>(MODELS[0].id);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [activeSessionByModel, setActiveSessionByModel] = useState<Record<string, string | null>>(
@@ -183,10 +191,29 @@ export default function App() {
       }
       return next;
     });
+    setSessionMacrosBySession((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
   const onSettingsSaved = (s: Settings) => {
     setSettings(s);
+  };
+
+  const sessionMacroKey = activeSessionId ?? PENDING_SESSION_KEY;
+  const activeSessionMacroIds = sessionMacrosBySession[sessionMacroKey] ?? [];
+
+  const onToggleSessionMacro = (macroId: string) => {
+    setSessionMacrosBySession((prev) => {
+      const cur = prev[sessionMacroKey] ?? [];
+      const next = cur.includes(macroId)
+        ? cur.filter((id) => id !== macroId)
+        : [...cur, macroId];
+      return { ...prev, [sessionMacroKey]: next };
+    });
   };
 
   const onStop = () => {
@@ -228,6 +255,15 @@ export default function App() {
       };
       setSessions((prev) => [meta, ...prev]);
       setActiveSessionByModel((prev) => ({ ...prev, [activeModelId]: sessionId! }));
+      // Przenieś presety sesji z slotu PENDING na realny sessionId.
+      setSessionMacrosBySession((prev) => {
+        const pending = prev[PENDING_SESSION_KEY];
+        if (!pending || pending.length === 0) return prev;
+        const next = { ...prev };
+        next[sessionId!] = pending;
+        delete next[PENDING_SESSION_KEY];
+        return next;
+      });
     }
 
     const sid = sessionId;
@@ -239,10 +275,22 @@ export default function App() {
     const ac = new AbortController();
     abortRef.current = ac;
 
+    // Wstrzyknij aktywne presety sesji do tekstu wiadomości lecącej do API.
+    // Widoczna `userMsg` w state i historii zapisywanej do dysku zostaje
+    // dokładnie taka, jaką napisał user.
+    const activeIds = sessionMacrosBySession[sid] ?? sessionMacrosBySession[PENDING_SESSION_KEY] ?? [];
+    const activeSessionMacros = activeIds
+      .map((id) => settings.macros.find((m) => m.id === id))
+      .filter((m): m is NonNullable<typeof m> => !!m && m.mode === "session");
+    const wireText = augmentForApi(text, activeSessionMacros);
+    const wireUserMsg: ChatMessage =
+      wireText === text ? userMsg : { ...userMsg, text: wireText };
+    const wireHistory = [...baseMessages, wireUserMsg];
+
     try {
       await streamChat({
         model: activeModel,
-        history: [...baseMessages, userMsg],
+        history: wireHistory,
         signal: ac.signal,
         settings,
         onDelta: (chunk) => {
@@ -330,7 +378,10 @@ export default function App() {
     <div className="gg-window">
       <Titlebar title="GAIdu GAIdu 10" />
       <Menubar />
-      <Toolbar onOpenSettings={() => setSettingsOpen(true)} />
+      <Toolbar
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenMacros={() => setMacrosOpen(true)}
+      />
       <div className="gg-body">
         <Sidebar
           models={MODELS}
@@ -352,6 +403,9 @@ export default function App() {
           <Composer
             disabled={isStreaming}
             isStreaming={isStreaming}
+            macros={settings.macros}
+            activeSessionMacroIds={activeSessionMacroIds}
+            onToggleSessionMacro={onToggleSessionMacro}
             onSend={onSend}
             onStop={onStop}
           />
@@ -361,6 +415,11 @@ export default function App() {
       <SettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        onSaved={onSettingsSaved}
+      />
+      <MacrosDialog
+        open={macrosOpen}
+        onClose={() => setMacrosOpen(false)}
         onSaved={onSettingsSaved}
       />
     </div>

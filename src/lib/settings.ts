@@ -30,5 +30,6 @@ function mergeDefaults(s: Partial<Settings> | null | undefined): Settings {
       auth: s.moonshot?.auth ?? { mode: "none" },
       model_id: s.moonshot?.model_id ?? null,
     },
+    macros: Array.isArray(s.macros) ? s.macros : [],
   };
 }

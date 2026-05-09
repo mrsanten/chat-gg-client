@@ -61,6 +61,27 @@ export type MoonshotAuth =
   | { mode: "none" }
   | { mode: "api_key"; api_key: string; base_url?: string | null };
 
+export type MacroMode = "action" | "session";
+
+export interface Macro {
+  id: string;
+  name: string;
+  /**
+   * Szablon tekstu. Dla `action`: jeśli zawiera `{input}`, placeholder
+   * zostanie podmieniony aktualnym tekstem z composera; bez placeholdera
+   * szablon trafi przed tekst usera (oddzielony pustą linią).
+   *
+   * Dla `session`: szablon jest dołączany niewidocznie do każdej wiadomości
+   * wysłanej w sesji, w której makro jest włączone (jak system prompt
+   * doczepiony per-message). Placeholder `{input}` jest opcjonalny.
+   */
+  template: string;
+  /** Tryb pracy makra. Default: `action`. */
+  mode?: MacroMode;
+  /** [tryb action] Auto-wyślij wiadomość po podstawieniu (default: true). */
+  auto_send?: boolean;
+}
+
 export interface Settings {
   anthropic: {
     auth: AnthropicAuth;
@@ -74,10 +95,12 @@ export interface Settings {
     auth: MoonshotAuth;
     model_id?: string | null;
   };
+  macros: Macro[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   anthropic: { auth: { mode: "none" }, model_id: null },
   openai: { auth: { mode: "none" }, model_id: null },
   moonshot: { auth: { mode: "none" }, model_id: null },
+  macros: [],
 };

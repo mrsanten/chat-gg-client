@@ -8,6 +8,19 @@ pub struct Settings {
     pub anthropic: AnthropicSettings,
     pub openai: OpenAiSettings,
     pub moonshot: MoonshotSettings,
+    pub macros: Vec<Macro>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Macro {
+    pub id: String,
+    pub name: String,
+    pub template: String,
+    /// "action" (default) lub "session". Trzymamy jako string, żeby kompatybilność wsteczna była łatwa.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_send: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

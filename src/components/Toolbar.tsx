@@ -2,25 +2,28 @@ import sunIcon from "../assets/sun.svg";
 
 interface Props {
   onOpenSettings: () => void;
+  onOpenMacros: () => void;
 }
 
 const TOOLBAR_ITEMS: Array<{ icon: string; label: string; action: keyof Actions }> = [
   { icon: "👤", label: "Dodaj", action: "noop" },
   { icon: "🔍", label: "Szukaj", action: "noop" },
   { icon: "✉", label: "SMS", action: "noop" },
-  { icon: "🗄", label: "Archiwum", action: "noop" },
+  { icon: "✦", label: "Makra", action: "openMacros" },
   { icon: "⚙", label: "Ustawienia", action: "openSettings" },
 ];
 
 interface Actions {
   noop: () => void;
   openSettings: () => void;
+  openMacros: () => void;
 }
 
-export function Toolbar({ onOpenSettings }: Props) {
+export function Toolbar({ onOpenSettings, onOpenMacros }: Props) {
   const actions: Actions = {
     noop: () => {},
     openSettings: onOpenSettings,
+    openMacros: onOpenMacros,
   };
 
   return (

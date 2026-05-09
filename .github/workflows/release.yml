@@ -54,7 +54,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "Gadu-Gadu AI ${{ github.ref_name }}"
+          releaseName: "GAIdu GAIdu ${{ github.ref_name }}"
           releaseBody: "Zobacz załączone pliki, żeby pobrać i zainstalować."
           releaseDraft: false
           prerelease: false
