@@ -12,6 +12,16 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.8.0",
+    date: "2026-05-09",
+    notes: [
+      "End-to-end encryption (E2E) wiadomości peer-to-peer przez MLS (RFC 9420). Każda nowa konwersacja zakłada zaszyfrowaną grupę MLS przy pierwszej wiadomości; serwer widzi tylko ciphertext i metadane (kto-do-kogo, rozmiar, czas), nie treść.",
+      "Klient automatycznie tworzy lokalną tożsamość MLS (signing key Ed25519) i publikuje paczki KeyPackage'ów na serwerze (uzupełnia gdy zostanie < 3).",
+      "Storage MLS w app_local_data_dir/mls/<account_id>.json — atomowy save z .tmp + rename. Identity przeżywa restart apki.",
+      "Stare konwersacje plain-text (sprzed v0.8) zostają plain — migracja na MLS dotyczy tylko nowych chatów.",
+    ],
+  },
+  {
     version: "0.7.0",
     date: "2026-05-09",
     notes: [

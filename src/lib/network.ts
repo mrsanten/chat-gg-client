@@ -19,6 +19,17 @@ export type ClientEvent =
   | { type: "send"; to: string; body: string; client_msg_id?: string }
   | { type: "typing"; to: string; state: TypingState }
   | { type: "ack_delivery"; message_id: string }
+  | { type: "ack_blob"; blob_id: string }
+  | { type: "ack_welcome"; welcome_id: string }
+  | {
+      type: "send_blob";
+      to: string;
+      group_id: string;
+      epoch: number;
+      ciphertext: string;
+      client_msg_id?: string;
+    }
+  | { type: "send_welcome"; to: string; ciphertext: string }
   | { type: "ping" };
 
 export type ServerEvent =
@@ -39,6 +50,29 @@ export type ServerEvent =
     }
   | { type: "typing"; from: string; state: TypingState }
   | { type: "presence"; username: string; online: boolean }
+  | {
+      type: "blob";
+      id: string;
+      from: string;
+      group_id: string;
+      epoch: number;
+      ciphertext: string;
+      created_at: string;
+    }
+  | {
+      type: "sent_blob";
+      id: string;
+      client_msg_id: string | null;
+      to: string;
+      created_at: string;
+    }
+  | {
+      type: "welcome";
+      id: string;
+      from: string;
+      ciphertext: string;
+      created_at: string;
+    }
   | { type: "pong" }
   | { type: "error"; code: string; message: string };
 
@@ -240,6 +274,10 @@ export class NetworkClient {
     // delivered, ale to potwierdza klient zobaczył.
     if (event.type === "message") {
       this.send({ type: "ack_delivery", message_id: event.id });
+    } else if (event.type === "blob") {
+      this.send({ type: "ack_blob", blob_id: event.id });
+    } else if (event.type === "welcome") {
+      this.send({ type: "ack_welcome", welcome_id: event.id });
     }
     for (const l of this.listeners) {
       try {

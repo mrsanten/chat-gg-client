@@ -2,7 +2,9 @@
 //!
 //! Phase 3A: PoC walidujący stack openmls 0.8 (test [`tests::e2e_demo_alice_bob`]).
 //! Phase 3C: persistent storage + identity init + KeyPackage generation.
-//! Phase 3D: group ops (create/process welcome/encrypt/decrypt) — TBD.
+//! Phase 3D: group ops (create_group_with_peer, process_welcome, encrypt, decrypt,
+//!           list_groups). Mapping group_id ↔ peer_username trzymany w
+//!           [`GroupRegistry`] zapisanej w storage providera.
 //!
 //! Storage: prosty JSON w `app_local_data_dir/mls/<account_id>.json`. Format
 //! pochodzi z `openmls_memory_storage::MemoryStorage::save_to_file`. Provider
@@ -12,6 +14,8 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
+use std::collections::HashMap;
+
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use openmls::prelude::*;
 use openmls_basic_credential::SignatureKeyPair;
@@ -19,7 +23,9 @@ use openmls_memory_storage::MemoryStorage;
 use openmls_rust_crypto::RustCrypto;
 use openmls_traits::types::Ciphersuite;
 use openmls_traits::OpenMlsProvider;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
+use tls_codec::{Deserialize as TlsDeserialize, Serialize as TlsSerialize};
 
 /// Domyślny ciphersuite. Wszyscy członkowie grupy muszą używać tego samego.
 pub const CIPHERSUITE: Ciphersuite =
@@ -275,9 +281,6 @@ pub async fn mls_generate_key_packages(
             let bundle = KeyPackage::builder()
                 .build(CIPHERSUITE, &provider, &signer, cred.clone())
                 .map_err(|e| anyhow::anyhow!("build KeyPackage: {e:?}"))?;
-            // KeyPackageBundle nie ma bezpośredniego serializera — bierzemy
-            // sam KeyPackage (publiczny) i serializujemy via tls_codec.
-            use tls_codec::Serialize as _;
             let kp_bytes = bundle
                 .key_package()
                 .tls_serialize_detached()
@@ -290,6 +293,323 @@ pub async fn mls_generate_key_packages(
     .await
     .map_err(|e| format!("join error: {e}"))?
     .map_err(|e| e.to_string())
+}
+
+// ──────────────────────────────────────── Phase 3D: group ops
+
+/// Mapowanie group_id (base64) → username peera. Trzymamy je obok
+/// MemoryStorage, w tym samym pliku JSON (przez nasz blob-meta storage).
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct GroupRegistry {
+    /// Klucz: base64 GroupId; wartość: username (case-preserved) peera.
+    /// W phase 5 (grupy) zamienimy na `Vec<String>` (lista członków).
+    groups: HashMap<String, String>,
+}
+
+const REGISTRY_LABEL: &str = "gaidu-groups";
+
+fn load_registry(provider: &PersistentProvider) -> anyhow::Result<GroupRegistry> {
+    match read_blob(&provider.storage, REGISTRY_LABEL)? {
+        None => Ok(GroupRegistry::default()),
+        Some(bytes) => Ok(serde_json::from_slice(&bytes)
+            .map_err(|e| anyhow::anyhow!("parse group registry: {e}"))?),
+    }
+}
+
+fn save_registry(provider: &PersistentProvider, reg: &GroupRegistry) -> anyhow::Result<()> {
+    let bytes =
+        serde_json::to_vec(reg).map_err(|e| anyhow::anyhow!("serialize group registry: {e}"))?;
+    write_blob(&provider.storage, REGISTRY_LABEL, &bytes)
+}
+
+/// Standardowy config grupy MLS w naszym systemie. Wszyscy klienci
+/// MUSZĄ używać tego samego, inaczej welcome/processing pójdzie w piach.
+fn group_config() -> MlsGroupCreateConfig {
+    MlsGroupCreateConfig::builder()
+        .wire_format_policy(PURE_CIPHERTEXT_WIRE_FORMAT_POLICY)
+        .ciphersuite(CIPHERSUITE)
+        .use_ratchet_tree_extension(true)
+        .build()
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateGroupResp {
+    pub group_id_b64: String,
+    pub welcome_b64: String,
+    pub epoch: u64,
+}
+
+/// Tworzy nową grupę MLS z peerem (1:1). Wymaga wcześniej pobranego
+/// KeyPackage peera (z `GET /key-packages/:username`).
+///
+/// Po tej operacji klient powinien:
+///   1. wysłać `welcome_b64` do peera przez `send_welcome`,
+///   2. zacząć wysyłać Application messages przez `mls_encrypt` + `send_blob`.
+#[tauri::command]
+pub async fn mls_create_group_with_peer(
+    app: AppHandle,
+    account_id: String,
+    peer_username: String,
+    peer_key_package_b64: String,
+) -> Result<CreateGroupResp, String> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<CreateGroupResp> {
+        let path = storage_path(&app, &account_id)?;
+        let provider = PersistentProvider::load_or_new(&path)?;
+        let (cred, signer, _) = ensure_identity(&provider, &account_id)?;
+
+        // Deserializacja KP peera.
+        let kp_bytes = B64
+            .decode(peer_key_package_b64.as_bytes())
+            .map_err(|e| anyhow::anyhow!("invalid base64 peer KP: {e}"))?;
+        let key_package_in = KeyPackageIn::tls_deserialize(&mut kp_bytes.as_slice())
+            .map_err(|e| anyhow::anyhow!("deserialize peer KP: {e:?}"))?;
+        let kp = key_package_in
+            .validate(provider.crypto(), ProtocolVersion::Mls10)
+            .map_err(|e| anyhow::anyhow!("validate peer KP: {e:?}"))?;
+
+        // Tworzymy grupę z samym sobą jako jedynym członkiem.
+        let mut group = MlsGroup::new(&provider, &signer, &group_config(), cred.clone())
+            .map_err(|e| anyhow::anyhow!("MlsGroup::new: {e:?}"))?;
+
+        let (_commit, welcome_msg, _gi) = group
+            .add_members(&provider, &signer, &[kp])
+            .map_err(|e| anyhow::anyhow!("add_members: {e:?}"))?;
+        group
+            .merge_pending_commit(&provider)
+            .map_err(|e| anyhow::anyhow!("merge_pending_commit: {e:?}"))?;
+
+        let welcome_bytes = welcome_msg
+            .tls_serialize_detached()
+            .map_err(|e| anyhow::anyhow!("serialize welcome: {e:?}"))?;
+        let group_id_bytes = group.group_id().as_slice().to_vec();
+        let group_id_b64 = B64.encode(&group_id_bytes);
+        let epoch = group.epoch().as_u64();
+
+        // Update registry.
+        let mut reg = load_registry(&provider)?;
+        reg.groups.insert(group_id_b64.clone(), peer_username.clone());
+        save_registry(&provider, &reg)?;
+
+        provider.save(&path)?;
+        Ok(CreateGroupResp {
+            group_id_b64,
+            welcome_b64: B64.encode(&welcome_bytes),
+            epoch,
+        })
+    })
+    .await
+    .map_err(|e| format!("join error: {e}"))?
+    .map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Serialize)]
+pub struct ProcessWelcomeResp {
+    pub group_id_b64: String,
+    pub epoch: u64,
+}
+
+/// Przetwarza Welcome (zwykle pierwszy event od peera, który zainicjował
+/// grupę). Klient powinien znać `sender_username` (z WS event `welcome.from`)
+/// — zapisujemy mapowanie group_id → sender_username, żeby kolejne blob-y
+/// można było pokazać jako od „bob".
+#[tauri::command]
+pub async fn mls_process_welcome(
+    app: AppHandle,
+    account_id: String,
+    sender_username: String,
+    welcome_b64: String,
+) -> Result<ProcessWelcomeResp, String> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<ProcessWelcomeResp> {
+        let path = storage_path(&app, &account_id)?;
+        let provider = PersistentProvider::load_or_new(&path)?;
+        // ensure_identity dla pewności — joinable group musi mieć identity.
+        let _ = ensure_identity(&provider, &account_id)?;
+
+        let bytes = B64
+            .decode(welcome_b64.as_bytes())
+            .map_err(|e| anyhow::anyhow!("invalid base64 welcome: {e}"))?;
+        let in_msg = MlsMessageIn::tls_deserialize_exact_bytes(&bytes)
+            .map_err(|e| anyhow::anyhow!("deserialize welcome msg: {e:?}"))?;
+        let welcome = match in_msg.extract() {
+            MlsMessageBodyIn::Welcome(w) => w,
+            other => anyhow::bail!("oczekiwano Welcome, dostalem {other:?}"),
+        };
+        let staged = StagedWelcome::new_from_welcome(
+            &provider,
+            group_config().join_config(),
+            welcome,
+            None,
+        )
+        .map_err(|e| anyhow::anyhow!("StagedWelcome::new: {e:?}"))?;
+        let group = staged
+            .into_group(&provider)
+            .map_err(|e| anyhow::anyhow!("into_group: {e:?}"))?;
+
+        let group_id_bytes = group.group_id().as_slice().to_vec();
+        let group_id_b64 = B64.encode(&group_id_bytes);
+        let epoch = group.epoch().as_u64();
+
+        let mut reg = load_registry(&provider)?;
+        reg.groups.insert(group_id_b64.clone(), sender_username);
+        save_registry(&provider, &reg)?;
+
+        provider.save(&path)?;
+        Ok(ProcessWelcomeResp {
+            group_id_b64,
+            epoch,
+        })
+    })
+    .await
+    .map_err(|e| format!("join error: {e}"))?
+    .map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Serialize)]
+pub struct EncryptResp {
+    pub ciphertext_b64: String,
+    pub epoch: u64,
+}
+
+/// Szyfruje plaintext jako MLS Application Message dla danej grupy.
+/// Zwraca ciphertext (base64) gotowy do wysłania przez `send_blob`.
+#[tauri::command]
+pub async fn mls_encrypt(
+    app: AppHandle,
+    account_id: String,
+    group_id_b64: String,
+    plaintext: String,
+) -> Result<EncryptResp, String> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<EncryptResp> {
+        if plaintext.is_empty() {
+            anyhow::bail!("plaintext nie może być pusty");
+        }
+        let path = storage_path(&app, &account_id)?;
+        let provider = PersistentProvider::load_or_new(&path)?;
+        let (_cred, signer, _) = ensure_identity(&provider, &account_id)?;
+
+        let gid = decode_group_id(&group_id_b64)?;
+        let mut group = MlsGroup::load(provider.storage(), &gid)
+            .map_err(|e| anyhow::anyhow!("load group from storage: {e:?}"))?
+            .ok_or_else(|| anyhow::anyhow!("grupa nie istnieje: {group_id_b64}"))?;
+
+        let app_msg = group
+            .create_message(&provider, &signer, plaintext.as_bytes())
+            .map_err(|e| anyhow::anyhow!("create_message: {e:?}"))?;
+        let bytes = app_msg
+            .tls_serialize_detached()
+            .map_err(|e| anyhow::anyhow!("serialize app msg: {e:?}"))?;
+        let epoch = group.epoch().as_u64();
+
+        provider.save(&path)?;
+        Ok(EncryptResp {
+            ciphertext_b64: B64.encode(&bytes),
+            epoch,
+        })
+    })
+    .await
+    .map_err(|e| format!("join error: {e}"))?
+    .map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Serialize)]
+pub struct DecryptResp {
+    pub plaintext: String,
+    /// Username nadawcy zapisany w GroupRegistry, jeśli znany.
+    pub sender_username: Option<String>,
+    pub epoch: u64,
+}
+
+/// Deszyfruje MLS Application Message. Zwraca plaintext + wskazówkę
+/// na nadawcę (z naszego mappingu group_id → username).
+#[tauri::command]
+pub async fn mls_decrypt(
+    app: AppHandle,
+    account_id: String,
+    group_id_b64: String,
+    ciphertext_b64: String,
+) -> Result<DecryptResp, String> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<DecryptResp> {
+        let path = storage_path(&app, &account_id)?;
+        let provider = PersistentProvider::load_or_new(&path)?;
+        let _ = ensure_identity(&provider, &account_id)?;
+
+        let gid = decode_group_id(&group_id_b64)?;
+        let mut group = MlsGroup::load(provider.storage(), &gid)
+            .map_err(|e| anyhow::anyhow!("load group: {e:?}"))?
+            .ok_or_else(|| anyhow::anyhow!("grupa nie istnieje"))?;
+
+        let bytes = B64
+            .decode(ciphertext_b64.as_bytes())
+            .map_err(|e| anyhow::anyhow!("invalid base64 ciphertext: {e}"))?;
+        let in_msg = MlsMessageIn::tls_deserialize_exact_bytes(&bytes)
+            .map_err(|e| anyhow::anyhow!("deserialize ciphertext: {e:?}"))?;
+        let proto = in_msg
+            .try_into_protocol_message()
+            .map_err(|e| anyhow::anyhow!("not protocol msg: {e:?}"))?;
+        let processed = group
+            .process_message(&provider, proto)
+            .map_err(|e| anyhow::anyhow!("process_message: {e:?}"))?;
+
+        let plaintext = match processed.into_content() {
+            ProcessedMessageContent::ApplicationMessage(am) => am.into_bytes(),
+            other => anyhow::bail!("nie ApplicationMessage: {other:?}"),
+        };
+        let plaintext = String::from_utf8(plaintext)
+            .map_err(|e| anyhow::anyhow!("plaintext nie jest UTF-8: {e}"))?;
+
+        let reg = load_registry(&provider)?;
+        let sender_username = reg.groups.get(&group_id_b64).cloned();
+
+        provider.save(&path)?;
+        Ok(DecryptResp {
+            plaintext,
+            sender_username,
+            epoch: group.epoch().as_u64(),
+        })
+    })
+    .await
+    .map_err(|e| format!("join error: {e}"))?
+    .map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Serialize)]
+pub struct GroupSummary {
+    pub group_id_b64: String,
+    pub peer_username: String,
+}
+
+/// Lista wszystkich grup, które klient zna (z GroupRegistry).
+/// Klient używa tego po starcie do zbudowania mapy peer → group_id.
+#[tauri::command]
+pub async fn mls_list_groups(
+    app: AppHandle,
+    account_id: String,
+) -> Result<Vec<GroupSummary>, String> {
+    tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<GroupSummary>> {
+        let path = storage_path(&app, &account_id)?;
+        let provider = PersistentProvider::load_or_new(&path)?;
+        let reg = load_registry(&provider)?;
+        let mut out: Vec<GroupSummary> = reg
+            .groups
+            .into_iter()
+            .map(|(group_id_b64, peer_username)| GroupSummary {
+                group_id_b64,
+                peer_username,
+            })
+            .collect();
+        out.sort_by(|a, b| a.peer_username.cmp(&b.peer_username));
+        Ok(out)
+    })
+    .await
+    .map_err(|e| format!("join error: {e}"))?
+    .map_err(|e| e.to_string())
+}
+
+fn decode_group_id(b64: &str) -> anyhow::Result<GroupId> {
+    let bytes = B64
+        .decode(b64.as_bytes())
+        .map_err(|e| anyhow::anyhow!("invalid base64 group_id: {e}"))?;
+    Ok(GroupId::from_slice(&bytes))
 }
 
 #[cfg(test)]
@@ -401,6 +721,145 @@ mod tests {
             other => anyhow::bail!("nie ApplicationMessage: {other:?}"),
         };
         assert_eq!(recovered.as_slice(), plain);
+
+        Ok(())
+    }
+
+    /// Phase 3D: pełny flow z PersistentProvider — Alice tworzy grupę z
+    /// Bobem przez jego KP, Bob processWelcome, oboje wymieniają zaszyfrowane
+    /// wiadomości w obie strony. Po każdej operacji save+reload, weryfikacja
+    /// że state zachowuje się przez restarty.
+    #[test]
+    fn phase_3d_full_flow_with_persistence() -> anyhow::Result<()> {
+        let dir = tempdir()?;
+        let alice_path = dir.path().join("alice.json");
+        let bob_path = dir.path().join("bob.json");
+
+        // 1) Bob generuje KP i go wystawia (symulujemy serwer przez Vec<u8>).
+        let bob_kp_b64: String = {
+            let provider = PersistentProvider::load_or_new(&bob_path)?;
+            let (cred, signer, _) = ensure_identity(&provider, "bob-id")?;
+            let bundle = KeyPackage::builder()
+                .build(CIPHERSUITE, &provider, &signer, cred)
+                .unwrap();
+            let bytes = bundle.key_package().tls_serialize_detached().unwrap();
+            provider.save(&bob_path)?;
+            B64.encode(&bytes)
+        };
+
+        // 2) Alice tworzy grupę z Bobem.
+        let (group_id_b64, welcome_b64) = {
+            let provider = PersistentProvider::load_or_new(&alice_path)?;
+            let (cred, signer, _) = ensure_identity(&provider, "alice-id")?;
+
+            let kp_bytes = B64.decode(bob_kp_b64.as_bytes())?;
+            let kp_in = KeyPackageIn::tls_deserialize(&mut kp_bytes.as_slice()).unwrap();
+            let kp = kp_in.validate(provider.crypto(), ProtocolVersion::Mls10).unwrap();
+
+            let mut group =
+                MlsGroup::new(&provider, &signer, &group_config(), cred.clone()).unwrap();
+            let (_c, welcome, _gi) = group.add_members(&provider, &signer, &[kp]).unwrap();
+            group.merge_pending_commit(&provider).unwrap();
+
+            let mut reg = load_registry(&provider)?;
+            let gid = B64.encode(group.group_id().as_slice());
+            reg.groups.insert(gid.clone(), "bob".into());
+            save_registry(&provider, &reg)?;
+            provider.save(&alice_path)?;
+            (gid, B64.encode(&welcome.tls_serialize_detached().unwrap()))
+        };
+
+        // 3) Bob przetwarza Welcome.
+        {
+            let provider = PersistentProvider::load_or_new(&bob_path)?;
+            let _ = ensure_identity(&provider, "bob-id")?;
+            let bytes = B64.decode(welcome_b64.as_bytes())?;
+            let in_msg = MlsMessageIn::tls_deserialize_exact_bytes(&bytes).unwrap();
+            let welcome = match in_msg.extract() {
+                MlsMessageBodyIn::Welcome(w) => w,
+                _ => panic!("not welcome"),
+            };
+            let staged = StagedWelcome::new_from_welcome(
+                &provider,
+                group_config().join_config(),
+                welcome,
+                None,
+            )
+            .unwrap();
+            let group = staged.into_group(&provider).unwrap();
+            assert_eq!(B64.encode(group.group_id().as_slice()), group_id_b64);
+
+            let mut reg = load_registry(&provider)?;
+            reg.groups.insert(group_id_b64.clone(), "alice".into());
+            save_registry(&provider, &reg)?;
+            provider.save(&bob_path)?;
+        }
+
+        // 4) Alice szyfruje "halo bob" i zapisuje state.
+        let cipher_a_to_b = {
+            let provider = PersistentProvider::load_or_new(&alice_path)?;
+            let (_cred, signer, _) = ensure_identity(&provider, "alice-id")?;
+            let gid = decode_group_id(&group_id_b64)?;
+            let mut group = MlsGroup::load(provider.storage(), &gid)?.unwrap();
+            let app_msg = group
+                .create_message(&provider, &signer, b"halo bob")
+                .unwrap();
+            provider.save(&alice_path)?;
+            B64.encode(app_msg.tls_serialize_detached().unwrap())
+        };
+
+        // 5) Bob deszyfruje.
+        {
+            let provider = PersistentProvider::load_or_new(&bob_path)?;
+            let _ = ensure_identity(&provider, "bob-id")?;
+            let gid = decode_group_id(&group_id_b64)?;
+            let mut group = MlsGroup::load(provider.storage(), &gid)?.unwrap();
+            let bytes = B64.decode(cipher_a_to_b.as_bytes())?;
+            let in_msg = MlsMessageIn::tls_deserialize_exact_bytes(&bytes).unwrap();
+            let proto = in_msg.try_into_protocol_message().unwrap();
+            let processed = group.process_message(&provider, proto).unwrap();
+            let plain = match processed.into_content() {
+                ProcessedMessageContent::ApplicationMessage(am) => am.into_bytes(),
+                _ => panic!("not app msg"),
+            };
+            assert_eq!(plain, b"halo bob");
+            provider.save(&bob_path)?;
+        }
+
+        // 6) Bob odpowiada — nowy load → encrypt → save.
+        let cipher_b_to_a = {
+            let provider = PersistentProvider::load_or_new(&bob_path)?;
+            let (_cred, signer, _) = ensure_identity(&provider, "bob-id")?;
+            let gid = decode_group_id(&group_id_b64)?;
+            let mut group = MlsGroup::load(provider.storage(), &gid)?.unwrap();
+            let app_msg = group
+                .create_message(&provider, &signer, b"siema alicja")
+                .unwrap();
+            provider.save(&bob_path)?;
+            B64.encode(app_msg.tls_serialize_detached().unwrap())
+        };
+
+        // 7) Alice deszyfruje (z reload — symulujemy restart apki).
+        {
+            let provider = PersistentProvider::load_or_new(&alice_path)?;
+            let _ = ensure_identity(&provider, "alice-id")?;
+            let gid = decode_group_id(&group_id_b64)?;
+            let mut group = MlsGroup::load(provider.storage(), &gid)?.unwrap();
+            let bytes = B64.decode(cipher_b_to_a.as_bytes())?;
+            let in_msg = MlsMessageIn::tls_deserialize_exact_bytes(&bytes).unwrap();
+            let proto = in_msg.try_into_protocol_message().unwrap();
+            let processed = group.process_message(&provider, proto).unwrap();
+            let plain = match processed.into_content() {
+                ProcessedMessageContent::ApplicationMessage(am) => am.into_bytes(),
+                _ => panic!("not app msg"),
+            };
+            assert_eq!(plain, b"siema alicja");
+            provider.save(&alice_path)?;
+
+            // Registry musi mieć mapowanie po reload.
+            let reg = load_registry(&provider)?;
+            assert_eq!(reg.groups.get(&group_id_b64), Some(&"bob".to_string()));
+        }
 
         Ok(())
     }

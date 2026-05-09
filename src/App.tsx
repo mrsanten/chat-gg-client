@@ -16,7 +16,15 @@ import { AddFriendDialog } from "./components/AddFriendDialog";
 import * as serverApi from "./lib/serverApi";
 import type { ServerContact, ServerMessage } from "./lib/serverApi";
 import { NetworkClient, type ConnectionStatus, type ServerEvent as NetEvent } from "./lib/network";
-import { mlsInit, mlsGenerateKeyPackages } from "./lib/mls";
+import {
+  mlsInit,
+  mlsGenerateKeyPackages,
+  mlsListGroups,
+  mlsCreateGroupWithPeer,
+  mlsProcessWelcome,
+  mlsEncrypt,
+  mlsDecrypt,
+} from "./lib/mls";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MODELS } from "./data/models";
 import { checkConfigured, streamChat, welcomeText, ProviderError } from "./lib/providers";
@@ -110,6 +118,11 @@ export default function App() {
   const [wsStatus, setWsStatus] = useState<ConnectionStatus>({ kind: "idle" });
   const networkRef = useRef<NetworkClient | null>(null);
   const historyLoadedFor = useRef<Set<string>>(new Set());
+  // Phase 3D: mapping peer_username → group_id_b64. Populowany przy
+  // boot z mls_list_groups + przy każdym welcome/create.
+  const peerGroupRef = useRef<Map<string, string>>(new Map());
+  // Odwrotny mapping group_id_b64 → peer_username (dla blob lookup).
+  const groupPeerRef = useRef<Map<string, string>>(new Map());
   const [sessionMacrosBySession, setSessionMacrosBySession] = useState<
     Record<string, string[]>
   >({});
@@ -350,8 +363,8 @@ export default function App() {
   /**
    * Inicjalizuje MLS (klucz podpisujący) i upewnia się, że na serwerze
    * leży co najmniej `MIN_KP` KeyPackage'ów. Jeśli nie — generuje
-   * `BATCH_KP` świeżych i publikuje. Idempotentne, można wołać po loginie
-   * i przy każdym starcie z istniejącym tokenem.
+   * `BATCH_KP` świeżych i publikuje. Wczytuje też lokalny rejestr grup
+   * do mapowań w pamięci. Idempotentne.
    */
   const ensureMlsReady = async (
     serverUrl: string,
@@ -364,6 +377,14 @@ export default function App() {
       const identity = await mlsInit(accountId);
       if (identity.freshly_created) {
         console.info("[mls] nowa tożsamość MLS dla", accountId);
+      }
+      // Wczytaj wszystkie grupy do mapowań w pamięci.
+      const groups = await mlsListGroups(accountId);
+      peerGroupRef.current.clear();
+      groupPeerRef.current.clear();
+      for (const g of groups) {
+        peerGroupRef.current.set(g.peer_username.toLowerCase(), g.group_id_b64);
+        groupPeerRef.current.set(g.group_id_b64, g.peer_username);
       }
       const { unconsumed } = await serverApi.keyPackagesCount(serverUrl, token);
       if (unconsumed < MIN_KP) {
@@ -379,6 +400,41 @@ export default function App() {
     } catch (e) {
       console.warn("[mls] init/keypackage flow nie udał się:", e);
     }
+  };
+
+  /**
+   * Zwraca group_id_b64 dla rozmowy z `peerUsername`. Jeśli grupa
+   * jeszcze nie istnieje, próbuje ją założyć: claim KeyPackage peera,
+   * mls_create_group_with_peer, send_welcome przez WS. Po sukcesie zwraca
+   * group_id; przy braku KP/peer-a rzuca z czytelnym komunikatem.
+   */
+  const ensureGroupWithPeer = async (peerUsername: string): Promise<string> => {
+    const accountId = settings.network.account_id;
+    const token = settings.network.token;
+    const serverUrl = settings.network.server_url;
+    if (!accountId || !token) {
+      throw new Error("nie jesteś zalogowany na serwerze GAIdu");
+    }
+    const cached = peerGroupRef.current.get(peerUsername.toLowerCase());
+    if (cached) return cached;
+
+    const claim = await serverApi.claimKeyPackage(serverUrl, token, peerUsername);
+    const created = await mlsCreateGroupWithPeer(
+      accountId,
+      claim.username,
+      claim.data,
+    );
+    peerGroupRef.current.set(claim.username.toLowerCase(), created.group_id_b64);
+    groupPeerRef.current.set(created.group_id_b64, claim.username);
+
+    // Wyślij Welcome do peera. send_welcome jest fire-and-forget;
+    // serwer enqueue'uje gdyby peer był offline.
+    networkRef.current?.send({
+      type: "send_welcome",
+      to: claim.username,
+      ciphertext: created.welcome_b64,
+    });
+    return created.group_id_b64;
   };
 
   const onAddedFriend = (c: ServerContact) => {
@@ -507,6 +563,96 @@ export default function App() {
         });
         break;
       }
+      case "sent_blob": {
+        // Phase 3D: analog 'sent' dla MLS blob-ów.
+        const peer = event.to;
+        setPeerMessagesByPeer((prev) => {
+          const cur = prev[peer] ?? [];
+          const next = cur.map((m) => {
+            if (event.client_msg_id && m.client_msg_id === event.client_msg_id) {
+              return {
+                ...m,
+                id: event.id,
+                created_at: event.created_at,
+                pending: false,
+              };
+            }
+            return m;
+          });
+          return { ...prev, [peer]: next };
+        });
+        break;
+      }
+      case "welcome": {
+        // Phase 3D: peer założył z nami grupę MLS. Przetwarzamy Welcome,
+        // wpisujemy do mappingów. Po tym kolejne 'blob' od tego peera
+        // będą deszyfrowalne.
+        const accountId = settings.network.account_id;
+        if (!accountId) break;
+        void (async () => {
+          try {
+            const resp = await mlsProcessWelcome(accountId, event.from, event.ciphertext);
+            peerGroupRef.current.set(event.from.toLowerCase(), resp.group_id_b64);
+            groupPeerRef.current.set(resp.group_id_b64, event.from);
+            console.info("[mls] joinedgrupa od", event.from, "gid=", resp.group_id_b64);
+          } catch (e) {
+            console.error("[mls] process_welcome failed:", e);
+          }
+        })();
+        break;
+      }
+      case "blob": {
+        // Phase 3D: zaszyfrowana wiadomość MLS od peera. Deszyfruj i
+        // dodaj do peerMessagesByPeer pod kluczem peer username
+        // (z 'event.from' lub naszego mappingu group_id → peer).
+        const accountId = settings.network.account_id;
+        if (!accountId) break;
+        const fallbackPeer = groupPeerRef.current.get(event.group_id) ?? event.from;
+        void (async () => {
+          try {
+            const resp = await mlsDecrypt(
+              accountId,
+              event.group_id,
+              event.ciphertext,
+            );
+            const peer = resp.sender_username ?? fallbackPeer;
+            const msg: PeerMessage = {
+              id: event.id,
+              from_me: false,
+              body: resp.plaintext,
+              created_at: event.created_at,
+              pending: false,
+            };
+            setPeerMessagesByPeer((prev) => {
+              const cur = prev[peer] ?? [];
+              if (cur.some((m) => m.id === msg.id)) return prev;
+              return { ...prev, [peer]: [...cur, msg] };
+            });
+            playNotify();
+          } catch (e) {
+            console.error("[mls] decrypt failed:", e);
+            // Fallback: pokazujemy placeholder, żeby user wiedział, że
+            // coś przyszło, ale nie udało się zdeszyfrować (np. brak
+            // welcome jeszcze, desync epoki).
+            const peer = fallbackPeer;
+            const errMsg = e instanceof Error ? e.message : String(e);
+            const msg: PeerMessage = {
+              id: event.id,
+              from_me: false,
+              body: `[E2E błąd deszyfrowania: ${errMsg}]`,
+              created_at: event.created_at,
+              pending: false,
+              errored: true,
+            };
+            setPeerMessagesByPeer((prev) => {
+              const cur = prev[peer] ?? [];
+              if (cur.some((m) => m.id === msg.id)) return prev;
+              return { ...prev, [peer]: [...cur, msg] };
+            });
+          }
+        })();
+        break;
+      }
       case "error": {
         console.warn("[network] server error:", event.code, event.message);
         break;
@@ -552,9 +698,10 @@ export default function App() {
     void ensurePeerHistoryLoaded(username);
   };
 
-  const onPeerSend = (text: string) => {
+  const onPeerSend = async (text: string) => {
     const peer = activePeerUsername;
-    if (!peer || !networkRef.current) return;
+    const accountId = settings.network.account_id;
+    if (!peer || !networkRef.current || !accountId) return;
     const trimmed = text.trim();
     if (!trimmed) return;
     const tmpId = "tmp-" + Math.random().toString(36).slice(2, 10);
@@ -570,12 +717,36 @@ export default function App() {
       const cur = prev[peer] ?? [];
       return { ...prev, [peer]: [...cur, msg] };
     });
-    networkRef.current.send({
-      type: "send",
-      to: peer,
-      body: trimmed,
-      client_msg_id: tmpId,
-    });
+
+    // Phase 3D: szyfrujemy wiadomość przez MLS, wysyłamy jako blob.
+    // Pierwsza wiadomość z peerem inicjuje grupę: claim KP → create →
+    // send_welcome → encrypt → send_blob.
+    try {
+      const groupId = await ensureGroupWithPeer(peer);
+      const enc = await mlsEncrypt(accountId, groupId, trimmed);
+      networkRef.current.send({
+        type: "send_blob",
+        to: peer,
+        group_id: groupId,
+        epoch: enc.epoch,
+        ciphertext: enc.ciphertext_b64,
+        client_msg_id: tmpId,
+      });
+    } catch (e) {
+      console.error("[mls] encrypt+send failed", e);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      setPeerMessagesByPeer((prev) => {
+        const cur = prev[peer] ?? [];
+        return {
+          ...prev,
+          [peer]: cur.map((m) =>
+            m.id === tmpId
+              ? { ...m, pending: false, errored: true, body: m.body + `\n\n[wysyłka E2E padła: ${errMsg}]` }
+              : m,
+          ),
+        };
+      });
+    }
   };
 
   const onQuit = async () => {
@@ -820,7 +991,9 @@ export default function App() {
               <Composer
                 disabled={false}
                 isStreaming={false}
-                onSend={(text) => onPeerSend(text)}
+                onSend={(text) => {
+                  void onPeerSend(text);
+                }}
               />
             </>
           ) : (

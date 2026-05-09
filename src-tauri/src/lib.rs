@@ -19,6 +19,11 @@ pub fn run() {
             sessions::delete_session,
             mls::mls_init,
             mls::mls_generate_key_packages,
+            mls::mls_create_group_with_peer,
+            mls::mls_process_welcome,
+            mls::mls_encrypt,
+            mls::mls_decrypt,
+            mls::mls_list_groups,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
