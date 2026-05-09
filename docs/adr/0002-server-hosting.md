@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Data:** 2026-05-09
-- **Autor:** mrellwart
+- **Autor:** stakeholder
 - **Powiązany ADR:** [0001](0001-network-chat-architecture.md)
 
 ## Kontekst

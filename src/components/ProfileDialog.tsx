@@ -80,7 +80,7 @@ export function ProfileDialog({ open, initialNick = "", required, onSave, onCanc
               <input
                 type="text"
                 className="gg-text-input"
-                placeholder="np. mrellwart"
+                placeholder="Twój nick"
                 value={nick}
                 maxLength={32}
                 autoFocus

@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Data:** 2026-05-09
-- **Autor:** mrellwart (z asystą Claude)
+- **Autor:** stakeholder (z asystą Claude)
 
 ## Kontekst
 
@@ -12,7 +12,7 @@ Cały stack jest klient-only: nie mamy serwera, nie mamy kont, nie mamy
 backendu.
 
 Pojawia się wymaganie: dorzucić czat między użytkownikami w stylu
-Gadu-Gadu. Po dyskusji ze stakeholderem (mrellwart) ustalono następujący
+Gadu-Gadu. Po dyskusji ze stakeholderem ustalono następujący
 zakres MVP:
 
 | # | Wymaganie                                       | Wartość |
@@ -286,5 +286,5 @@ Po implementacji niniejszy ADR powinien być linkowany z:
 
 ## Zatwierdzenie
 
-Stakeholder (mrellwart) zatwierdził kierunek 2026-05-09 na rozmowie z
+Stakeholder zatwierdził kierunek 2026-05-09 na rozmowie z
 Claude. Phase 1 startuje po opublikowaniu tego ADR.
