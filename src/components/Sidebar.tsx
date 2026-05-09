@@ -1,6 +1,7 @@
 import { useState } from "react";
 import sunIcon from "../assets/sun.svg";
 import type { SessionMeta, ToolModel } from "../types";
+import type { ServerContact } from "../lib/serverApi";
 
 interface Props {
   models: ToolModel[];
@@ -14,6 +15,13 @@ interface Props {
   onDeleteSession: (id: string) => void;
   nick?: string;
   onEditProfile?: () => void;
+  // Phase 2B.2: lista znajomych. Pokazujemy tylko gdy networkLoggedIn.
+  networkLoggedIn?: boolean;
+  contacts?: ServerContact[];
+  activePeerUsername?: string | null;
+  onSelectPeer?: (username: string) => void;
+  onAddFriend?: () => void;
+  onRemoveFriend?: (contact: ServerContact) => void;
 }
 
 export function Sidebar(props: Props) {
@@ -29,10 +37,17 @@ export function Sidebar(props: Props) {
     onDeleteSession,
     nick,
     onEditProfile,
+    networkLoggedIn,
+    contacts,
+    activePeerUsername,
+    onSelectPeer,
+    onAddFriend,
+    onRemoveFriend,
   } = props;
 
   const [openTools, setOpenTools] = useState(true);
   const [openHistory, setOpenHistory] = useState(true);
+  const [openFriends, setOpenFriends] = useState(true);
   const [desc, setDesc] = useState("");
 
   const activeModel = models.find((m) => m.id === activeModelId);
@@ -89,6 +104,60 @@ export function Sidebar(props: Props) {
           );
         })}
       </Section>
+
+      {networkLoggedIn && (
+        <Section
+          title="Znajomi"
+          count={contacts && contacts.length > 0 ? `(${contacts.filter((c) => c.online).length}/${contacts.length})` : undefined}
+          open={openFriends}
+          onToggle={() => setOpenFriends((v) => !v)}
+          action={
+            <button
+              type="button"
+              className="gg-section-action"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddFriend?.();
+              }}
+              title="Dodaj znajomego po username"
+            >
+              + Dodaj
+            </button>
+          }
+        >
+          {(!contacts || contacts.length === 0) && (
+            <div className="gg-history-empty">Brak znajomych. Kliknij „+ Dodaj" żeby zaprosić kogoś po username.</div>
+          )}
+          {contacts?.map((c) => (
+            <div
+              key={c.peer_id}
+              className={`gg-session-item${activePeerUsername === c.username ? " is-active" : ""}`}
+              onClick={() => onSelectPeer?.(c.username)}
+              title={c.online ? "Online" : "Offline"}
+            >
+              <span
+                className={`gg-friend-dot ${c.online ? "gg-friend-dot--on" : "gg-friend-dot--off"}`}
+                aria-hidden
+              />
+              <span className="gg-session-title">
+                {c.nickname && c.nickname.trim().length > 0 ? c.nickname : c.username}
+              </span>
+              <button
+                type="button"
+                className="gg-session-del"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveFriend?.(c);
+                }}
+                title="Usuń znajomego"
+                aria-label="Usuń"
+              >
+                <span className="gg-glyph gg-glyph--close" />
+              </button>
+            </div>
+          ))}
+        </Section>
+      )}
 
       <Section
         title={`Historia${activeModel ? ` ${activeModel.name}` : ""}`}

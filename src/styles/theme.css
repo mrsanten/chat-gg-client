@@ -1700,3 +1700,22 @@ input, textarea {
   border-color: var(--gg-green);
   box-shadow: 0 0 4px rgba(46, 184, 46, 0.7);
 }
+
+/* Sidebar Znajomi — kropka presence */
+.gg-friend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  border: 1px solid #6a6a6a;
+  flex-shrink: 0;
+}
+.gg-friend-dot--on {
+  background: var(--gg-green-light);
+  border-color: var(--gg-green);
+  box-shadow: 0 0 4px rgba(46, 184, 46, 0.7);
+}
+.gg-friend-dot--off {
+  background: #b8b8b8;
+}

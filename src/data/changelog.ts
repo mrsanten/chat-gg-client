@@ -12,6 +12,17 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.7.0",
+    date: "2026-05-09",
+    notes: [
+      'Pierwsza wersja czatu między użytkownikami: Toolbar → „Sieć" daje rejestrację/login na serwerze GAIdu (Twoim VPS lub lokalnym dev), z hasłem i tokenem JWT zapisanym lokalnie.',
+      'Nowa sekcja „Znajomi" w panelu bocznym — dodawanie po username (auto-bidirectional), kropka presence (zielona = online, szara = offline), klik = otwiera czat z osobą.',
+      "WebSocket realtime: doręczanie wiadomości na żywo, kolejka offline (gdy znajomy jest offline, wiadomość czeka na serwerze i dolatuje przy jego reconnect), auto-reconnect klienta z exponential backoff.",
+      'Mała zielona kropka na ikonie „Sieć" w toolbarze pokazuje, czy WebSocket jest aktywny.',
+      "Wiadomości w trybie peer-to-peer są jeszcze plaintextem na serwerze (TLS na drucie). Pełne E2E (MLS) przyjdzie w wersji 0.8+.",
+    ],
+  },
+  {
     version: "0.6.0",
     date: "2026-05-09",
     notes: [

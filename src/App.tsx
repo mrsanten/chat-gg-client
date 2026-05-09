@@ -12,7 +12,10 @@ import { UpdateToast } from "./components/UpdateToast";
 import { ChangelogDialog } from "./components/ChangelogDialog";
 import { ProfileDialog } from "./components/ProfileDialog";
 import { NetworkAccountDialog } from "./components/NetworkAccountDialog";
+import { AddFriendDialog } from "./components/AddFriendDialog";
 import * as serverApi from "./lib/serverApi";
+import type { ServerContact, ServerMessage } from "./lib/serverApi";
+import { NetworkClient, type ConnectionStatus, type ServerEvent as NetEvent } from "./lib/network";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MODELS } from "./data/models";
 import { checkConfigured, streamChat, welcomeText, ProviderError } from "./lib/providers";
@@ -99,6 +102,13 @@ export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileForcedFirstRun, setProfileForcedFirstRun] = useState(false);
   const [networkOpen, setNetworkOpen] = useState(false);
+  const [addFriendOpen, setAddFriendOpen] = useState(false);
+  const [contacts, setContacts] = useState<ServerContact[]>([]);
+  const [activePeerUsername, setActivePeerUsername] = useState<string | null>(null);
+  const [peerMessagesByPeer, setPeerMessagesByPeer] = useState<Record<string, PeerMessage[]>>({});
+  const [wsStatus, setWsStatus] = useState<ConnectionStatus>({ kind: "idle" });
+  const networkRef = useRef<NetworkClient | null>(null);
+  const historyLoadedFor = useRef<Set<string>>(new Set());
   const [sessionMacrosBySession, setSessionMacrosBySession] = useState<
     Record<string, string[]>
   >({});
@@ -154,6 +164,8 @@ export default function App() {
       if (s.network?.token && s.network.server_url) {
         try {
           await serverApi.me(s.network.server_url, s.network.token);
+          // Token OK → załaduj listę znajomych.
+          void refreshContacts(s.network.server_url, s.network.token);
         } catch (e) {
           if (e instanceof serverApi.ServerError && e.status === 401) {
             console.warn("[network] zapisany token jest nieważny, czyszczę");
@@ -259,6 +271,7 @@ export default function App() {
       abortRef.current?.abort();
       setIsStreaming(false);
     }
+    setActivePeerUsername(null);
     setActiveModelId(id);
     if (!(id in activeSessionByModel)) {
       const latest = sessions.find((s) => s.modelId === id);
@@ -311,6 +324,40 @@ export default function App() {
 
   const onSettingsSaved = (s: Settings) => {
     setSettings(s);
+    // Po (wy)logowaniu odświeżamy lub czyścimy listę kontaktów.
+    if (!s.network.token) {
+      setContacts([]);
+      setActivePeerUsername(null);
+    } else {
+      void refreshContacts(s.network.server_url, s.network.token);
+    }
+  };
+
+  const refreshContacts = async (serverUrl: string, token: string) => {
+    try {
+      const list = await serverApi.listContacts(serverUrl, token);
+      setContacts(list);
+    } catch (e) {
+      console.warn("[network] listContacts failed:", e);
+    }
+  };
+
+  const onAddedFriend = (c: ServerContact) => {
+    setContacts((prev) => {
+      if (prev.some((x) => x.peer_id === c.peer_id)) return prev;
+      return [...prev, c].sort((a, b) => a.username.localeCompare(b.username));
+    });
+  };
+
+  const onRemoveFriend = async (c: ServerContact) => {
+    if (!settings.network.token) return;
+    try {
+      await serverApi.removeContact(settings.network.server_url, settings.network.token, c.peer_id);
+      setContacts((prev) => prev.filter((x) => x.peer_id !== c.peer_id));
+      if (activePeerUsername === c.username) setActivePeerUsername(null);
+    } catch (e) {
+      console.warn("[network] removeContact failed:", e);
+    }
   };
 
   const onSaveNick = async (nick: string) => {
@@ -324,6 +371,172 @@ export default function App() {
   const onCancelProfile = () => {
     if (profileForcedFirstRun) return;
     setProfileOpen(false);
+  };
+
+  // ─────────── NetworkClient lifecycle (Phase 2B.3)
+
+  useEffect(() => {
+    const client = new NetworkClient({
+      serverUrl: settings.network.server_url,
+      token: settings.network.token,
+    });
+    networkRef.current = client;
+
+    const unsubStatus = client.onStatus(setWsStatus);
+    const unsub = client.on((event) => handleNetworkEvent(event));
+
+    if (settings.network.token) client.connect();
+
+    return () => {
+      unsub();
+      unsubStatus();
+      client.disconnect();
+      networkRef.current = null;
+    };
+    // ESLint eskaluje na settings, ale chcemy tylko jeden instans NetworkClient
+    // przez całe życie komponentu. Konfig podajemy przez updateConfig poniżej.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reconnect przy zmianie tokena/serverUrl
+  useEffect(() => {
+    const client = networkRef.current;
+    if (!client) return;
+    client.updateConfig({
+      serverUrl: settings.network.server_url,
+      token: settings.network.token,
+    });
+    if (settings.network.token) {
+      client.connect();
+    } else {
+      client.disconnect();
+    }
+  }, [settings.network.server_url, settings.network.token]);
+
+  const handleNetworkEvent = (event: NetEvent) => {
+    switch (event.type) {
+      case "ready": {
+        // Po połączeniu refresh kontaktów (świeże flagi online).
+        if (settings.network.token) {
+          void refreshContacts(settings.network.server_url, settings.network.token);
+        }
+        break;
+      }
+      case "presence": {
+        setContacts((prev) =>
+          prev.map((c) =>
+            c.username === event.username ? { ...c, online: event.online } : c,
+          ),
+        );
+        break;
+      }
+      case "message": {
+        const peer = event.from;
+        const msg: PeerMessage = {
+          id: event.id,
+          from_me: false,
+          body: event.body,
+          created_at: event.created_at,
+          pending: false,
+        };
+        setPeerMessagesByPeer((prev) => {
+          const cur = prev[peer] ?? [];
+          // Idempotent: jeśli już mamy to id (z history), nie duplikuj.
+          if (cur.some((m) => m.id === msg.id)) return prev;
+          return { ...prev, [peer]: [...cur, msg] };
+        });
+        playNotify();
+        break;
+      }
+      case "sent": {
+        // Echo wysłanej wiadomości — zamień tymczasowy id na server id.
+        const peer = event.to;
+        setPeerMessagesByPeer((prev) => {
+          const cur = prev[peer] ?? [];
+          const next = cur.map((m) => {
+            if (event.client_msg_id && m.client_msg_id === event.client_msg_id) {
+              return {
+                ...m,
+                id: event.id,
+                created_at: event.created_at,
+                pending: false,
+              };
+            }
+            return m;
+          });
+          return { ...prev, [peer]: next };
+        });
+        break;
+      }
+      case "error": {
+        console.warn("[network] server error:", event.code, event.message);
+        break;
+      }
+      default:
+        break;
+    }
+  };
+
+  const ensurePeerHistoryLoaded = async (peerUsername: string) => {
+    if (historyLoadedFor.current.has(peerUsername)) return;
+    if (!settings.network.token) return;
+    historyLoadedFor.current.add(peerUsername);
+    try {
+      const list = await serverApi.fetchHistory(
+        settings.network.server_url,
+        settings.network.token,
+        peerUsername,
+        { limit: 50 },
+      );
+      const myId = settings.network.account_id ?? null;
+      // Server zwraca DESC — odwracamy na ASC dla wyświetlania.
+      const asc = [...list].reverse().map((m) => serverMsgToPeer(m, myId));
+      setPeerMessagesByPeer((prev) => {
+        const cur = prev[peerUsername] ?? [];
+        // Merge zachowując już-wczytane pending wiadomości na końcu.
+        const seenIds = new Set(asc.map((m) => m.id));
+        const trailing = cur.filter((m) => m.pending || !seenIds.has(m.id));
+        return { ...prev, [peerUsername]: [...asc, ...trailing] };
+      });
+    } catch (e) {
+      console.warn("[network] history failed:", e);
+      historyLoadedFor.current.delete(peerUsername);
+    }
+  };
+
+  const onSelectPeer = (username: string) => {
+    if (isStreaming) {
+      abortRef.current?.abort();
+      setIsStreaming(false);
+    }
+    setActivePeerUsername(username);
+    void ensurePeerHistoryLoaded(username);
+  };
+
+  const onPeerSend = (text: string) => {
+    const peer = activePeerUsername;
+    if (!peer || !networkRef.current) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const tmpId = "tmp-" + Math.random().toString(36).slice(2, 10);
+    const msg: PeerMessage = {
+      id: tmpId,
+      client_msg_id: tmpId,
+      from_me: true,
+      body: trimmed,
+      created_at: new Date().toISOString(),
+      pending: true,
+    };
+    setPeerMessagesByPeer((prev) => {
+      const cur = prev[peer] ?? [];
+      return { ...prev, [peer]: [...cur, msg] };
+    });
+    networkRef.current.send({
+      type: "send",
+      to: peer,
+      body: trimmed,
+      client_msg_id: tmpId,
+    });
   };
 
   const onQuit = async () => {
@@ -518,7 +731,7 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenMacros={() => setMacrosOpen(true)}
         onOpenNetwork={() => setNetworkOpen(true)}
-        networkOnline={false /* phase 2B.3 podepnie WS state */}
+        networkOnline={wsStatus.kind === "connected"}
       />
       <div className="gg-body">
         <Sidebar
@@ -536,22 +749,59 @@ export default function App() {
             setProfileForcedFirstRun(false);
             setProfileOpen(true);
           }}
+          networkLoggedIn={!!settings.network.token && !!settings.network.username}
+          contacts={contacts}
+          activePeerUsername={activePeerUsername}
+          onSelectPeer={onSelectPeer}
+          onAddFriend={() => setAddFriendOpen(true)}
+          onRemoveFriend={onRemoveFriend}
         />
         <main className="gg-main">
-          <Conversation
-            model={activeModel}
-            messages={messages}
-            sessionTitle={activeSessionMeta?.title ?? null}
-          />
-          <Composer
-            disabled={isStreaming}
-            isStreaming={isStreaming}
-            macros={settings.macros}
-            activeSessionMacroIds={activeSessionMacroIds}
-            onToggleSessionMacro={onToggleSessionMacro}
-            onSend={onSend}
-            onStop={onStop}
-          />
+          {activePeerUsername ? (
+            <>
+              <Conversation
+                model={{
+                  id: `peer:${activePeerUsername}`,
+                  name: activePeerUsername,
+                  provider: "anthropic",
+                  apiModelId: "",
+                }}
+                messages={peerToChatMessages(
+                  peerMessagesByPeer[activePeerUsername] ?? [],
+                  activePeerUsername,
+                )}
+                sessionTitle={
+                  wsStatus.kind === "connected"
+                    ? "online"
+                    : wsStatus.kind === "reconnecting"
+                      ? "łączenie…"
+                      : "offline"
+                }
+              />
+              <Composer
+                disabled={false}
+                isStreaming={false}
+                onSend={(text) => onPeerSend(text)}
+              />
+            </>
+          ) : (
+            <>
+              <Conversation
+                model={activeModel}
+                messages={messages}
+                sessionTitle={activeSessionMeta?.title ?? null}
+              />
+              <Composer
+                disabled={isStreaming}
+                isStreaming={isStreaming}
+                macros={settings.macros}
+                activeSessionMacroIds={activeSessionMacroIds}
+                onToggleSessionMacro={onToggleSessionMacro}
+                onSend={onSend}
+                onStop={onStop}
+              />
+            </>
+          )}
         </main>
       </div>
       <Statusbar />
@@ -571,6 +821,13 @@ export default function App() {
         settings={settings}
         onClose={() => setNetworkOpen(false)}
         onSaved={onSettingsSaved}
+      />
+      <AddFriendDialog
+        open={addFriendOpen}
+        serverUrl={settings.network.server_url}
+        token={settings.network.token}
+        onClose={() => setAddFriendOpen(false)}
+        onAdded={onAddedFriend}
       />
       <ProfileDialog
         open={profileOpen}
@@ -606,4 +863,49 @@ function getLatest(
       return prev;
     });
   });
+}
+
+interface PeerMessage {
+  /** Server UUID po `sent`/`message` lub lokalny tymczasowy "tmp-..." dopóki nie potwierdzony. */
+  id: string;
+  /** Tylko dla wiadomości wysłanych z tej apki — do korelacji `sent` echo. */
+  client_msg_id?: string;
+  from_me: boolean;
+  body: string;
+  created_at: string;
+  pending?: boolean;
+  errored?: boolean;
+}
+
+function fmtPeerTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+  } catch {
+    return "--:--:--";
+  }
+}
+
+/** Mapuje listę PeerMessage na format ChatMessage używany przez Conversation. */
+function peerToChatMessages(list: PeerMessage[], peerUsername: string): ChatMessage[] {
+  const modelId = `peer:${peerUsername}`;
+  return list.map((m) => ({
+    id: m.id,
+    role: m.from_me ? "user" : "assistant",
+    modelId,
+    text: m.body,
+    timestamp: fmtPeerTime(m.created_at),
+    streaming: false,
+    errored: m.errored,
+  }));
+}
+
+function serverMsgToPeer(m: ServerMessage, myAccountId: string | null | undefined): PeerMessage {
+  return {
+    id: m.id,
+    from_me: !!myAccountId && m.from_id === myAccountId,
+    body: m.body,
+    created_at: m.created_at,
+    pending: false,
+  };
 }
