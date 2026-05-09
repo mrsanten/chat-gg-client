@@ -24,3 +24,13 @@ futures-util = "0.3"
 tokio = { version = "1", features = ["macros", "io-util", "process", "rt-multi-thread"] }
 anyhow = "1"
 thiserror = "2"
+
+[dev-dependencies]
+# Phase 3 PoC (E2E via MLS — RFC 9420). Trzymamy w dev-dependencies, bo
+# crate jest tylko w testach (`mls::tests::*`) — nie chcemy spuchnąć
+# release binarki przed wpięciem MLS-a w runtime (phase 3C+).
+openmls = "0.8"
+openmls_rust_crypto = "0.5"
+openmls_basic_credential = "0.5"
+openmls_traits = "0.5"
+tls_codec = { version = "0.4", features = ["std", "derive"] }

@@ -1,4 +1,6 @@
 mod chat;
+#[cfg(test)]
+mod mls;
 mod sessions;
 mod settings;
 
