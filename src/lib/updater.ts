@@ -1,45 +1,58 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
-export type UpdaterStatus =
+export interface PendingUpdate {
+  /** Surowy obiekt z pluginu — trzymamy, żeby później wywołać download/install. */
+  update: Update;
+  version: string;
+  currentVersion: string;
+  notes?: string;
+  date?: string;
+}
+
+export type DownloadStatus =
   | { state: "idle" }
-  | { state: "checking" }
-  | { state: "available"; version: string; notes?: string; date?: string }
   | { state: "downloading"; downloaded: number; total?: number }
-  | { state: "ready" }
-  | { state: "up-to-date" }
+  | { state: "installing" }
   | { state: "error"; message: string };
 
-export type UpdaterListener = (status: UpdaterStatus) => void;
-
 /**
- * Check for an update and, if available, download + install it.
- * `silent`: when true, returns early without throwing if no update is found.
- *
- * Wymaga skonfigurowanego `plugins.updater` w tauri.conf.json oraz publikacji
- * podpisanego artefaktu + manifestu `latest.json` pod adresem `endpoints`.
+ * Sprawdza endpoint updatera. Zwraca info o nowej wersji albo `null`,
+ * gdy aplikacja jest aktualna lub coś poszło nie tak (błąd jest cicho
+ * połykany — popup się po prostu nie pojawi).
  */
-export async function runUpdateFlow(onStatus: UpdaterListener = () => {}): Promise<void> {
+export async function checkForUpdate(): Promise<PendingUpdate | null> {
   try {
-    onStatus({ state: "checking" });
-    const update: Update | null = await check();
-
-    if (!update) {
-      onStatus({ state: "up-to-date" });
-      return;
-    }
-
-    onStatus({
-      state: "available",
+    const update = await check();
+    if (!update) return null;
+    return {
+      update,
       version: update.version,
+      currentVersion: update.currentVersion,
       notes: update.body ?? undefined,
       date: update.date ?? undefined,
-    });
+    };
+  } catch (err) {
+    console.warn("[updater] check failed", err);
+    return null;
+  }
+}
 
+/**
+ * Pobiera + instaluje wcześniej znalezioną aktualizację, na końcu restartuje
+ * aplikację. Zwraca `false` jeśli wystąpił błąd (status z opisem trafia do
+ * `onStatus`).
+ */
+export async function installUpdate(
+  pending: PendingUpdate,
+  onStatus: (status: DownloadStatus) => void = () => {},
+): Promise<boolean> {
+  try {
     let downloaded = 0;
     let total: number | undefined;
+    onStatus({ state: "downloading", downloaded: 0, total });
 
-    await update.downloadAndInstall((event) => {
+    await pending.update.downloadAndInstall((event) => {
       switch (event.event) {
         case "Started":
           total = event.data.contentLength;
@@ -50,16 +63,16 @@ export async function runUpdateFlow(onStatus: UpdaterListener = () => {}): Promi
           onStatus({ state: "downloading", downloaded, total });
           break;
         case "Finished":
-          onStatus({ state: "ready" });
+          onStatus({ state: "installing" });
           break;
       }
     });
 
-    // Na Windows/Linux trzeba sami zrestartować, na macOS Tauri robi to samo
-    // po zakończeniu installu. `relaunch()` jest bezpieczne na obu.
     await relaunch();
+    return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     onStatus({ state: "error", message });
+    return false;
   }
 }

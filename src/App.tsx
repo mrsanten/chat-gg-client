@@ -8,12 +8,18 @@ import { Composer } from "./components/Composer";
 import { Statusbar } from "./components/Statusbar";
 import { SettingsDialog } from "./components/Settings";
 import { MacrosDialog } from "./components/MacrosDialog";
+import { UpdateToast } from "./components/UpdateToast";
 import { MODELS } from "./data/models";
 import { checkConfigured, streamChat, welcomeText, ProviderError } from "./lib/providers";
 import { augmentForApi } from "./lib/macros";
 import { playNotify } from "./lib/sound";
 import { loadSettings } from "./lib/settings";
-import { runUpdateFlow } from "./lib/updater";
+import {
+  checkForUpdate,
+  installUpdate,
+  type DownloadStatus,
+  type PendingUpdate,
+} from "./lib/updater";
 import {
   deleteSession as deleteSessionRpc,
   deriveTitle,
@@ -86,6 +92,8 @@ export default function App() {
   const [sessionMacrosBySession, setSessionMacrosBySession] = useState<
     Record<string, string[]>
   >({});
+  const [pendingUpdate, setPendingUpdate] = useState<PendingUpdate | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<DownloadStatus>({ state: "idle" });
   const [activeModelId, setActiveModelId] = useState<string>(MODELS[0].id);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [activeSessionByModel, setActiveSessionByModel] = useState<Record<string, string | null>>(
@@ -123,13 +131,23 @@ export default function App() {
       setSettings(s);
       setSessions(sess);
     })();
-    // Sprawdź aktualizacje w tle przy starcie. Błędy logujemy, nie blokujemy UI.
-    runUpdateFlow((status) => {
-      if (status.state === "error") console.warn("[updater]", status.message);
-      else console.info("[updater]", status);
+    // Sprawdź aktualizacje w tle przy starcie. Jeśli nowa wersja istnieje,
+    // wystawimy popup w prawym górnym rogu — nic samo się nie zainstaluje.
+    checkForUpdate().then((pending) => {
+      if (pending) setPendingUpdate(pending);
     });
     return () => abortRef.current?.abort();
   }, []);
+
+  const onInstallUpdate = async () => {
+    if (!pendingUpdate) return;
+    await installUpdate(pendingUpdate, setUpdateStatus);
+    // Po sukcesie nastąpił `relaunch()`, więc tu nie dojdziemy.
+  };
+  const onDismissUpdate = () => {
+    setPendingUpdate(null);
+    setUpdateStatus({ state: "idle" });
+  };
 
   const switchActiveSession = async (modelId: string, sessionId: string | null) => {
     setActiveSessionByModel((prev) => ({ ...prev, [modelId]: sessionId }));
@@ -422,6 +440,14 @@ export default function App() {
         onClose={() => setMacrosOpen(false)}
         onSaved={onSettingsSaved}
       />
+      {pendingUpdate && (
+        <UpdateToast
+          pending={pendingUpdate}
+          status={updateStatus}
+          onInstall={onInstallUpdate}
+          onDismiss={onDismissUpdate}
+        />
+      )}
     </div>
   );
 }
