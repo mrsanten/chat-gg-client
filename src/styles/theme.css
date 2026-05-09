@@ -1641,9 +1641,7 @@ input, textarea {
   margin-bottom: 2px;
 }
 
-/* Statusbar version */
+/* Statusbar version - dziedziczy kolor i font-size z .gg-statusbar */
 .gg-statusbar-version {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: #555;
+  font-family: inherit;
 }
