@@ -1,0 +1,104 @@
+mod auth;
+mod config;
+mod error;
+mod state;
+
+use anyhow::Context;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::routing::{get, post};
+use axum::Json;
+use serde_json::json;
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::TraceLayer;
+
+use crate::config::Config;
+use crate::state::AppState;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // dotenvy ignoruje brak pliku, więc OK w produkcji.
+    let _ = dotenvy::dotenv();
+
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "info,gaidu_server=debug,tower_http=info".into()),
+        )
+        .compact()
+        .init();
+
+    let cfg = Config::from_env()?;
+    tracing::info!("ładuję konfigurację, BIND_ADDR={}", cfg.bind_addr);
+
+    let state = AppState::from_config(&cfg)
+        .await
+        .context("nie mogę zainicjować AppState (Postgres niedostępny?)")?;
+
+    let app = axum::Router::new()
+        .route("/healthz", get(healthz))
+        .route("/auth/register", post(auth::handlers::register))
+        .route("/auth/login", post(auth::handlers::login))
+        .route("/me", get(auth::handlers::me))
+        .with_state(state)
+        .layer(TraceLayer::new_for_http())
+        .layer(
+            // Phase 1: pozwalamy każdemu (Tauri webview ma podejrzane originy).
+            // W produkcji zawężymy do listy znanych Tauri builds + dev origin.
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any),
+        );
+
+    let listener = tokio::net::TcpListener::bind(&cfg.bind_addr)
+        .await
+        .with_context(|| format!("nie mogę bindować {}", cfg.bind_addr))?;
+    tracing::info!("nasłuchuję na {}", cfg.bind_addr);
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .context("serwer padł")?;
+
+    Ok(())
+}
+
+async fn healthz(State(state): State<AppState>) -> impl IntoResponse {
+    // Lekki check: SELECT 1. Jeśli baza padnie, healthz zwróci 503.
+    match sqlx::query_scalar::<_, i32>("SELECT 1")
+        .fetch_one(&state.db)
+        .await
+    {
+        Ok(_) => (StatusCode::OK, Json(json!({ "ok": true }))),
+        Err(e) => {
+            tracing::warn!("healthz: db down: {e:?}");
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({ "ok": false, "error": "db" })),
+            )
+        }
+    }
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
+    #[cfg(unix)]
+    let term = async {
+        if let Ok(mut sig) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
+            sig.recv().await;
+        }
+    };
+    #[cfg(not(unix))]
+    let term = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => tracing::info!("Ctrl+C, zamykam"),
+        _ = term => tracing::info!("SIGTERM, zamykam"),
+    }
+}

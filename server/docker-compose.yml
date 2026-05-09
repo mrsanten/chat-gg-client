@@ -1,0 +1,25 @@
+# Lokalny stack dev. Postgres na 5432, dane persystentne w nazwanym volume.
+# Sam serwer odpalasz `cargo run` z hosta — szybciej niż rebuildować obraz przy
+# każdej zmianie kodu.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gaidu
+      POSTGRES_PASSWORD: gaidu
+      POSTGRES_DB: gaidu
+    ports:
+      # Mapujemy 5433 na hoscie, zeby nie kolidowac z innymi postgresami
+      # (np. Postgres.app, brew services).
+      - "5433:5432"
+    volumes:
+      - gaidu_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gaidu -d gaidu"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  gaidu_pg:

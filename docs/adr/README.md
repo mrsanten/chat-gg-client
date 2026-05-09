@@ -26,3 +26,4 @@ status starego na `Superseded by ADR-XXXX`.
 | #    | Tytuł                                                           | Status                |
 |------|-----------------------------------------------------------------|-----------------------|
 | 0001 | [Architektura czatu między użytkownikami](0001-network-chat-architecture.md) | Accepted              |
+| 0002 | [Hosting serwera](0002-server-hosting.md)                       | Accepted              |
