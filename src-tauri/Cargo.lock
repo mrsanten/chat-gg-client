@@ -4820,7 +4820,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-app"
-version = "0.13.1"
+version = "0.13.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4831,6 +4831,7 @@ dependencies = [
  "openmls_rust_crypto",
  "openmls_traits",
  "reqwest 0.12.28",
+ "rustls",
  "serde",
  "serde_json",
  "tauri",

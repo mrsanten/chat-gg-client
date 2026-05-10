@@ -2401,3 +2401,219 @@ input, textarea {
   font-size: 12px;
   min-height: 60px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE LAYOUT — telefon w pionie / wąski viewport (<= 768px)
+   Strategia:
+   - Tytułbar i menubar idą do schowka (iOS sam ma status bar)
+   - Toolbar zostaje na górze, dostaje hamburgera
+   - Sidebar → off-canvas drawer wjeżdżający z lewej + backdrop
+   - Conversation + Composer zajmują całą szerokość
+   - Modale prawie full-screen
+   - safe-area-inset-* żeby uniknąć kolizji z notchem/home indicator
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Desktop: hamburger ukryty */
+.gg-toolbar-hamburger {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Cała aplikacja zajmuje 100% wysokości viewportu, bez okiennych dekoracji */
+  .gg-window {
+    height: 100vh;
+    height: 100dvh; /* dynamic viewport — zachowuje się sensownie gdy
+                       Safari/Chrome chowa/pokazuje URL bar */
+  }
+
+  /* Tytułbar + menubar — chowamy. OS sam zarządza */
+  .gg-titlebar,
+  .gg-menubar {
+    display: none;
+  }
+
+  /* Toolbar: kompaktowy, bez brand-logo, z hamburgerem */
+  .gg-toolbar {
+    padding-top: env(safe-area-inset-top);
+    gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .gg-toolbar-brand {
+    display: none;
+  }
+  .gg-toolbar-hamburger {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    padding: 0;
+  }
+  .gg-toolbar-hamburger:active {
+    background: rgba(0, 0, 0, 0.08);
+  }
+  .gg-toolbar-hamburger-bar {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--text);
+    border-radius: 1px;
+  }
+  .gg-toolbar-btn {
+    min-width: 56px;
+    flex-shrink: 0;
+  }
+  .gg-toolbar-btn-label {
+    font-size: 10px;
+  }
+
+  /* Sidebar = drawer */
+  .gg-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 84%;
+    max-width: 320px;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease-out;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.2);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .gg-sidebar.is-mobile-open {
+    transform: translateX(0);
+  }
+  .gg-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 199;
+    animation: gg-fade-in 0.15s ease-out;
+  }
+  @keyframes gg-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Main bierze całą szerokość bo sidebar jest position:fixed */
+  .gg-body {
+    display: block;
+    height: 100%;
+  }
+  .gg-main {
+    height: 100%;
+    width: 100%;
+  }
+
+  /* Statusbar może zostać ale niech ma safe-area */
+  .gg-statusbar {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Conversation + chat header — bez gridów, pełna szerokość */
+  .gg-chatwin {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .gg-conversation {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px;
+  }
+
+  /* Composer: pełna szerokość, safe-area dół, większe touch targety */
+  .gg-composer {
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+  }
+  .gg-composer-input {
+    font-size: 16px; /* iOS nie zoomuje na focus tylko gdy font >= 16px */
+    min-height: 44px;
+  }
+  .gg-send-btn,
+  .gg-stop-btn,
+  .gg-emote-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Wiadomości — wąskie bańki na telefonie */
+  .gg-msg {
+    gap: 6px;
+  }
+  .gg-msg-bubble {
+    max-width: 78vw;
+  }
+
+  /* Modale: near-fullscreen na małym ekranie */
+  .gg-modal-backdrop {
+    padding: 0;
+  }
+  .gg-modal {
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .gg-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  /* User profile dialog: telefon nie cierpi na szerokość; rozluźniamy */
+  .gg-userprofile {
+    min-width: 0;
+    max-width: none;
+  }
+
+  /* Emote picker — pełna szerokość, anchorowany u dołu nad composerem */
+  .gg-emote-popover {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: 50vh;
+  }
+
+  /* Friend item / session item — większe touch targety */
+  .gg-friend-item,
+  .gg-session-item,
+  .gg-tool-item {
+    padding: 8px;
+    min-height: 44px;
+  }
+
+  /* Reklama u dołu sidebar — opcjonalna, na telefonie raczej zbędna */
+  .gg-sidebar-ad {
+    display: none;
+  }
+}
+
+/* Bardzo wąskie ekrany (iPhone SE landscape itp.) — jeszcze ciaśniej */
+@media (max-width: 380px) {
+  .gg-toolbar-btn {
+    min-width: 48px;
+  }
+  .gg-toolbar-btn-label {
+    display: none;
+  }
+}

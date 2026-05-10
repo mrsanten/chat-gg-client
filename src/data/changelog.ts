@@ -12,6 +12,17 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.13.2",
+    date: "2026-05-11",
+    notes: [
+      "Multi-device sync wiadomości: wysłana wiadomość pojawia się teraz live na drugim urządzeniu tego samego konta. Server: `Sent` event ma pole `body`. Klient: rozróżnia echo lokalne (swap tmp-id) i z innego device-a (insert from_me).",
+      "Historia odświeża się na każde przełączenie peera (zamiast cache raz-na-sesję) oraz przy WS reconnect (`ready`). Plus periodic refresh co 30 s gdy okno ma focus, i natychmiast przy `focus` event. Multi-device dla offline-catch-up: jak byłeś offline na jednym device-ie a wiadomości doszły do drugiego, focus apki dociąga świeże z `/history`.",
+      "Mobile UI (iOS + Android via Tauri 2): sidebar jako off-canvas drawer z backdropem, hamburger w toolbarze, titlebar/menubar ukryte (OS sam zarządza). Safe-area insets dla notchy i home indicator. Touch targety min 44×44pt. Modale near-fullscreen. Composer input font-size 16px (iOS nie auto-zoomuje). Hook `useMobile()` reaguje na rotację. Drugi breakpoint <=380px chowa labele toolbara.",
+      'iOS build pipeline: jawna rejestracja rustls crypto providera (ring) w `lib.rs::run()` przed startem pluginów (inaczej reqwest 0.13 panicuje „No provider set"). Plugin-updater i plugin-process cfg-gateowane na nie-mobile (Apple/Google nie pozwalają na self-update spoza store-ów). Capabilities rozdzielone: `default.json` cross-platform, `desktop.json` z `platforms: ["linux", "macOS", "windows"]` dla updater/process permissions.',
+      "Skrypt `build-emotes.mjs` używa `fileURLToPath` z `node:url` (zamiast `URL.pathname`), naprawia ENOENT na Windowsie.",
+    ],
+  },
+  {
     version: "0.13.1",
     date: "2026-05-10",
     notes: [

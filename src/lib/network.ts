@@ -47,6 +47,9 @@ export type ServerEvent =
       id: string;
       client_msg_id: string | null;
       to: string;
+      /** Body od v0.13.2 — pozwala drugiemu device-owi tego samego usera
+       *  dorzucić outgoing message bez czekania na history refetch. */
+      body?: string;
       created_at: string;
     }
   | { type: "typing"; from: string; state: TypingState }

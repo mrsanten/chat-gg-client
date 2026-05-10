@@ -116,10 +116,13 @@ pub enum ServerEvent {
         created_at: DateTime<Utc>,
     },
     /// Echo nadawcy: serwer potwierdza, że wiadomość została zapisana.
+    /// `body` od v0.13.2 — pozwala innym urządzeniom tego samego usera
+    /// zsynchronizować outgoing message na żywo (multi-device sync).
     Sent {
         id: Uuid,
         client_msg_id: Option<String>,
         to: String,
+        body: String,
         created_at: DateTime<Utc>,
     },
     /// Peer zaczął/skończył pisać.
@@ -719,7 +722,9 @@ async fn handle_client_event(
 
             // Echo do nadawcy ("Sent") — wszystkie jego device dostają sygnał
             // że wiadomość poszła. Lokalnie zoptymistyczny render może teraz
-            // zatwierdzić tymczasowy id.
+            // zatwierdzić tymczasowy id. Body jest też tutaj, żeby drugie
+            // urządzenie tego samego usera (które nie ma tmp-id) mogło je
+            // dorzucić do listy (multi-device sync outgoing).
             state
                 .hub
                 .send_to(
@@ -728,6 +733,7 @@ async fn handle_client_event(
                         id: msg_id,
                         client_msg_id: client_msg_id.clone(),
                         to: peer_username.clone(),
+                        body: body.clone(),
                         created_at,
                     },
                 )

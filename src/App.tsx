@@ -13,6 +13,7 @@ import { ChangelogDialog } from "./components/ChangelogDialog";
 import { NetworkAccountDialog } from "./components/NetworkAccountDialog";
 import { AddFriendDialog } from "./components/AddFriendDialog";
 import { UserProfileDialog } from "./components/UserProfileDialog";
+import { useMobile } from "./lib/useMobile";
 import * as serverApi from "./lib/serverApi";
 import type { ServerContact, HistoryEntry } from "./lib/serverApi";
 import {
@@ -103,6 +104,8 @@ function messagesToStored(messages: ChatMessage[]): ChatSession["messages"] {
 const PENDING_SESSION_KEY = "__pending__";
 
 export default function App() {
+  const isMobile = useMobile();
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [macrosOpen, setMacrosOpen] = useState(false);
@@ -357,6 +360,31 @@ export default function App() {
   useEffect(() => {
     activePeerUsernameRef.current = activePeerUsername;
   }, [activePeerUsername]);
+
+  // Periodic history refresh: gdy okno ma focus, co 30s dociągamy historię
+  // aktywnego peera. Plus reaguj na sam event `focus` żeby było reactive
+  // przy wracaniu do aplikacji. Multi-device sync defense-in-depth — gdyby
+  // event `sent` od drugiego device-a zaginął albo WS chwilowo padł, focus
+  // i tak załapie świeże wiadomości. Trzymamy ref na ensurePeerHistoryLoaded
+  // żeby closure setIntervala miał świeży token/account_id.
+  const ensureHistoryRef = useRef<(peer: string) => Promise<void>>(async () => {});
+  useEffect(() => {
+    ensureHistoryRef.current = ensurePeerHistoryLoaded;
+  });
+  useEffect(() => {
+    const tick = () => {
+      if (!document.hasFocus()) return;
+      const peer = activePeerUsernameRef.current;
+      if (!peer) return;
+      void ensureHistoryRef.current(peer);
+    };
+    const interval = window.setInterval(tick, 30_000);
+    window.addEventListener("focus", tick);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", tick);
+    };
+  }, []);
 
   // Idle detection: po 1 min bez aktywności (mouse/keyboard/touch/focus)
   // przełączamy status na AFK i informujemy server. Każda aktywność
@@ -675,9 +703,13 @@ export default function App() {
   const handleNetworkEvent = (event: NetEvent) => {
     switch (event.type) {
       case "ready": {
-        // Po połączeniu refresh kontaktów (świeże flagi online).
+        // Po połączeniu refresh kontaktów (świeże flagi online) + historia
+        // aktywnego peera (multi-device sync: dociągamy co poszło/przyszło
+        // gdy byliśmy offline albo z innego device-a).
         if (settings.network.token) {
           void refreshContacts(settings.network.server_url, settings.network.token);
+          const peer = activePeerUsernameRef.current;
+          if (peer) void ensurePeerHistoryLoaded(peer);
         }
         break;
       }
@@ -741,22 +773,45 @@ export default function App() {
         break;
       }
       case "sent": {
-        // Echo wysłanej wiadomości — zamień tymczasowy id na server id.
+        // Echo wysłanej wiadomości. Dwa scenariusze:
+        //  (a) wysłaliśmy z TEGO device-a → mamy tmp z client_msg_id, robimy
+        //      swap na server id.
+        //  (b) wysłaliśmy z INNEGO device-a tego samego konta → nie mamy
+        //      tmp, wstawiamy świeżą from_me z body z serwera (multi-device
+        //      sync). `body` od v0.13.2 — stary serwer go nie pośle, więc
+        //      jeśli brak, fallback do "(wysłane z innego urządzenia)".
         const peer = event.to;
         setPeerMessagesByPeer((prev) => {
           const cur = prev[peer] ?? [];
-          const next = cur.map((m) => {
-            if (event.client_msg_id && m.client_msg_id === event.client_msg_id) {
-              return {
-                ...m,
-                id: event.id,
-                created_at: event.created_at,
-                pending: false,
-              };
-            }
-            return m;
-          });
-          return { ...prev, [peer]: next };
+          const matchedLocally = !!(
+            event.client_msg_id &&
+            cur.some((m) => m.client_msg_id === event.client_msg_id)
+          );
+          if (matchedLocally) {
+            const next = cur.map((m) => {
+              if (event.client_msg_id && m.client_msg_id === event.client_msg_id) {
+                return {
+                  ...m,
+                  id: event.id,
+                  created_at: event.created_at,
+                  pending: false,
+                };
+              }
+              return m;
+            });
+            return { ...prev, [peer]: next };
+          }
+          // (b) — inne urządzenie. Sprawdź jeszcze, czy nie mamy już tego
+          // server-id (np. po history refetch), żeby nie dublować.
+          if (cur.some((m) => m.id === event.id)) return prev;
+          const msg: PeerMessage = {
+            id: event.id,
+            from_me: true,
+            body: event.body ?? "(wiadomość z innego urządzenia)",
+            created_at: event.created_at,
+            pending: false,
+          };
+          return { ...prev, [peer]: [...cur, msg] };
         });
         break;
       }
@@ -880,7 +935,9 @@ export default function App() {
   };
 
   const ensurePeerHistoryLoaded = async (peerUsername: string) => {
-    if (historyLoadedFor.current.has(peerUsername)) return;
+    // Set-tracking dla pierwszego loadu nie blokuje kolejnych — multi-device
+    // sync wymaga żeby zawsze refetchować na peer-select/reconnect. Dedup
+    // jest po server-id w środku funkcji, więc re-fetch jest tani.
     if (!settings.network.token || !settings.network.account_id) return;
     historyLoadedFor.current.add(peerUsername);
     try {
@@ -1276,6 +1333,9 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenMacros={() => setMacrosOpen(true)}
         onOpenNetwork={() => setNetworkOpen(true)}
+        onToggleSidebar={
+          isMobile ? () => setSidebarMobileOpen((v) => !v) : undefined
+        }
         onAddFriend={() => {
           // Bez konta sieciowego nie ma jak dodać znajomego — przekieruj
           // do logowania, AddFriend bez tokena i tak nic nie zrobi.
@@ -1327,6 +1387,8 @@ export default function App() {
               ? () => setProfileDialog({ mode: "self" })
               : undefined
           }
+          mobileOpen={isMobile && sidebarMobileOpen}
+          onMobileClose={() => setSidebarMobileOpen(false)}
         />
         <main className="gg-main">
           {activePeerUsername ? (

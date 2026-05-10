@@ -7,6 +7,8 @@ interface Props {
   onAddFriend: () => void;
   /** Czy WebSocket jest aktywny — kropka na ikonie. Phase 2B.3+. */
   networkOnline?: boolean;
+  /** Mobile: otwórz drawer sidebaru. CSS chowa ten przycisk na desktopie. */
+  onToggleSidebar?: () => void;
 }
 
 const TOOLBAR_ITEMS: Array<{ icon: string; label: string; action: keyof Actions }> = [
@@ -31,6 +33,7 @@ export function Toolbar({
   onOpenNetwork,
   onAddFriend,
   networkOnline,
+  onToggleSidebar,
 }: Props) {
   const actions: Actions = {
     noop: () => {},
@@ -42,6 +45,18 @@ export function Toolbar({
 
   return (
     <div className="gg-toolbar">
+      {onToggleSidebar && (
+        <button
+          type="button"
+          className="gg-toolbar-hamburger"
+          onClick={onToggleSidebar}
+          aria-label="Otwórz menu"
+        >
+          <span className="gg-toolbar-hamburger-bar" />
+          <span className="gg-toolbar-hamburger-bar" />
+          <span className="gg-toolbar-hamburger-bar" />
+        </button>
+      )}
       <div className="gg-toolbar-brand" aria-hidden>
         <img src={appIcon} alt="" />
       </div>

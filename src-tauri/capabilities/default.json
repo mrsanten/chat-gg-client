@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
+  "description": "Cross-platform capability — wszystkie OS-y (desktop + mobile).",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -10,8 +10,6 @@
     "core:window:allow-close",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
-    "core:window:allow-is-maximized",
-    "updater:default",
-    "process:allow-restart"
+    "core:window:allow-is-maximized"
   ]
 }

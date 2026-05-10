@@ -36,6 +36,10 @@ interface Props {
   avatar?: string;
   /** Klik w ramkę avatara wywołuje to (rodzic odpala file picker, kompresuje, zapisuje). */
   onChangeAvatar?: () => void;
+  /** Mobile drawer: true → sidebar wsunięty, false → schowany za viewport. */
+  mobileOpen?: boolean;
+  /** Mobile: zamknij drawer (klik w backdrop / wybór elementu z listy). */
+  onMobileClose?: () => void;
 }
 
 export function Sidebar(props: Props) {
@@ -62,7 +66,21 @@ export function Sidebar(props: Props) {
     onDescriptionChange,
     avatar,
     onChangeAvatar,
+    mobileOpen,
+    onMobileClose,
   } = props;
+
+  // Wrap onSelectModel/onSelectSession/onSelectPeer żeby na mobilce zamykać
+  // drawer po wyborze — typowy mobile UX.
+  const closeAfter =
+    <Args extends unknown[]>(fn: (...args: Args) => void) =>
+    (...args: Args) => {
+      fn(...args);
+      onMobileClose?.();
+    };
+  const selectModel = closeAfter(onSelectModel);
+  const selectSession = closeAfter(onSelectSession);
+  const selectPeer = onSelectPeer ? closeAfter(onSelectPeer) : undefined;
 
   const [openTools, setOpenTools] = useState(true);
   const [openHistory, setOpenHistory] = useState(true);
@@ -72,7 +90,11 @@ export function Sidebar(props: Props) {
   const modelSessions = sessions.filter((s) => s.modelId === activeModelId);
 
   return (
-    <aside className="gg-sidebar">
+    <>
+      {mobileOpen && (
+        <div className="gg-sidebar-backdrop" onClick={onMobileClose} aria-hidden />
+      )}
+      <aside className={`gg-sidebar${mobileOpen ? " is-mobile-open" : ""}`}>
       <div className="gg-profile">
         <div className="gg-profile-avatar">
           <div
@@ -152,7 +174,7 @@ export function Sidebar(props: Props) {
               <div
                 key={c.peer_id}
                 className={`gg-friend-item${activePeerUsername === c.username ? " is-active" : ""}`}
-                onClick={() => onSelectPeer?.(c.username)}
+                onClick={() => selectPeer?.(c.username)}
                 title={
                   peerDesc
                     ? `${c.online ? "Online" : "Offline"}\n${peerDesc}`
@@ -215,7 +237,7 @@ export function Sidebar(props: Props) {
             <div
               key={m.id}
               className={`gg-tool-item${m.id === activeModelId && !activePeerUsername ? " is-active" : ""}`}
-              onClick={() => onSelectModel(m.id)}
+              onClick={() => selectModel(m.id)}
             >
               <span
                 className={`gg-tool-item-status ${ok ? "gg-tool-item-status--on" : "gg-tool-item-status--off"}`}
@@ -254,7 +276,7 @@ export function Sidebar(props: Props) {
           <div
             key={s.id}
             className={`gg-session-item${s.id === activeSessionId && !activePeerUsername ? " is-active" : ""}`}
-            onClick={() => onSelectSession(s.id)}
+            onClick={() => selectSession(s.id)}
           >
             <span className="gg-session-title">{s.title}</span>
             <span className="gg-session-time">{formatRel(s.updatedAt)}</span>
@@ -283,7 +305,8 @@ export function Sidebar(props: Props) {
           </div>
         </a>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 
