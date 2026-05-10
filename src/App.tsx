@@ -14,7 +14,7 @@ import { ProfileDialog } from "./components/ProfileDialog";
 import { NetworkAccountDialog } from "./components/NetworkAccountDialog";
 import { AddFriendDialog } from "./components/AddFriendDialog";
 import * as serverApi from "./lib/serverApi";
-import type { ServerContact, ServerMessage } from "./lib/serverApi";
+import type { ServerContact, HistoryEntry } from "./lib/serverApi";
 import { NetworkClient, type ConnectionStatus, type ServerEvent as NetEvent } from "./lib/network";
 import {
   mlsInit,
@@ -705,7 +705,7 @@ export default function App() {
 
   const ensurePeerHistoryLoaded = async (peerUsername: string) => {
     if (historyLoadedFor.current.has(peerUsername)) return;
-    if (!settings.network.token) return;
+    if (!settings.network.token || !settings.network.account_id) return;
     historyLoadedFor.current.add(peerUsername);
     try {
       const list = await serverApi.fetchHistory(
@@ -714,15 +714,45 @@ export default function App() {
         peerUsername,
         { limit: 50 },
       );
-      const myId = settings.network.account_id ?? null;
-      // Server zwraca DESC — odwracamy na ASC dla wyświetlania.
-      const asc = [...list].reverse().map((m) => serverMsgToPeer(m, myId));
+      const myId = settings.network.account_id;
+      const accountId = myId;
+      // Server zwraca DESC — odwracamy na ASC do wyświetlania.
+      const asc = [...list].reverse();
+      const decoded: PeerMessage[] = [];
+      for (const e of asc) {
+        if (e.kind === "plain") {
+          decoded.push(plainEntryToPeer(e, myId));
+        } else {
+          // Blob — próbujemy zdeszyfrować lokalnie.
+          try {
+            const dec = await mlsDecrypt(accountId, e.group_id, e.ciphertext);
+            decoded.push({
+              id: e.id,
+              from_me: e.from_id === myId,
+              body: dec.plaintext,
+              created_at: e.created_at,
+              pending: false,
+              e2e: true,
+            });
+          } catch (decryptErr) {
+            console.warn("[mls] historic blob undecryptable:", decryptErr);
+            decoded.push({
+              id: e.id,
+              from_me: e.from_id === myId,
+              body: "[stara wiadomość — klucze rotowane]",
+              created_at: e.created_at,
+              pending: false,
+              e2e: true,
+              errored: true,
+            });
+          }
+        }
+      }
       setPeerMessagesByPeer((prev) => {
         const cur = prev[peerUsername] ?? [];
-        // Merge zachowując już-wczytane pending wiadomości na końcu.
-        const seenIds = new Set(asc.map((m) => m.id));
+        const seenIds = new Set(decoded.map((m) => m.id));
         const trailing = cur.filter((m) => m.pending || !seenIds.has(m.id));
-        return { ...prev, [peerUsername]: [...asc, ...trailing] };
+        return { ...prev, [peerUsername]: [...decoded, ...trailing] };
       });
     } catch (e) {
       console.warn("[network] history failed:", e);
@@ -1180,12 +1210,16 @@ function peerToChatMessages(list: PeerMessage[], peerUsername: string): ChatMess
   }));
 }
 
-function serverMsgToPeer(m: ServerMessage, myAccountId: string | null | undefined): PeerMessage {
+function plainEntryToPeer(
+  e: HistoryEntry & { kind: "plain" },
+  myAccountId: string | null | undefined,
+): PeerMessage {
   return {
-    id: m.id,
-    from_me: !!myAccountId && m.from_id === myAccountId,
-    body: m.body,
-    created_at: m.created_at,
+    id: e.id,
+    from_me: !!myAccountId && e.from_id === myAccountId,
+    body: e.body,
+    created_at: e.created_at,
     pending: false,
+    e2e: false,
   };
 }

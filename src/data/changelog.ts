@@ -12,6 +12,13 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.9.1",
+    date: "2026-05-09",
+    notes: [
+      "Historia wiadomości E2E w peer chat była dotąd niewidoczna — endpoint /history zwracał tylko legacy plain text z phase 2, pomijał wszystkie zaszyfrowane blob-y MLS z phase 3+. Teraz serwer zwraca oba typy w jednej liście, klient deszyfruje historic blob-y lokalnie. Stare wiadomości, dla których klucze MLS już rotowały, dostają placeholder „[stara wiadomość — klucze rotowane]”.",
+    ],
+  },
+  {
     version: "0.9.0",
     date: "2026-05-09",
     notes: [

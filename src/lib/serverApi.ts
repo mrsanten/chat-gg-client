@@ -34,6 +34,28 @@ export interface ServerMessage {
   delivered_at: string | null;
 }
 
+export type HistoryEntry =
+  | {
+      kind: "plain";
+      id: string;
+      from_id: string;
+      to_id: string;
+      body: string;
+      created_at: string;
+      delivered_at: string | null;
+    }
+  | {
+      kind: "blob";
+      id: string;
+      from_id: string;
+      to_id: string;
+      group_id: string;
+      epoch: number;
+      ciphertext: string;
+      created_at: string;
+      delivered_at: string | null;
+    };
+
 export class ServerError extends Error {
   status: number;
   code: string;
@@ -181,11 +203,11 @@ export async function fetchHistory(
   token: string,
   peer: string,
   opts: { limit?: number; before?: string } = {},
-): Promise<ServerMessage[]> {
+): Promise<HistoryEntry[]> {
   const params = new URLSearchParams({ peer });
   if (opts.limit) params.set("limit", String(opts.limit));
   if (opts.before) params.set("before", opts.before);
-  return request<ServerMessage[]>("GET", serverUrl, `/history?${params}`, { token });
+  return request<HistoryEntry[]>("GET", serverUrl, `/history?${params}`, { token });
 }
 
 // ─────────────────────────────────── KeyPackages (MLS, phase 3)
