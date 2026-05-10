@@ -4,8 +4,12 @@
 // `sb/` jest świadomie pomijane.
 import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+// fileURLToPath sobie radzi z windowsowym `/C:/...` w URL.pathname; samo
+// `.pathname` daje na Windowsie ścieżkę z leading slash, którą path.join
+// potem sklejał w `D:\D:\a\...`.
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const EMOTES_DIR = join(ROOT, "public", "emotes");
 const OUT = join(ROOT, "src", "data", "emotes.ts");
 

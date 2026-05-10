@@ -47,6 +47,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/login", post(auth::handlers::login))
         .route("/me", get(auth::handlers::me))
         .route("/me/profile", axum::routing::put(auth::handlers::update_profile))
+        .route("/me/avatar", axum::routing::put(auth::handlers::update_avatar))
         .route(
             "/contacts",
             get(contacts::list_contacts).post(contacts::add_contact),

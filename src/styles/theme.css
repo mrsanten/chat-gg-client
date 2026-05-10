@@ -330,6 +330,7 @@ input, textarea {
   gap: 4px;
 }
 .gg-profile-avatar-frame {
+  position: relative;
   width: 56px;
   height: 56px;
   background: #ffffff;
@@ -338,10 +339,35 @@ input, textarea {
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-inset-deep);
+  overflow: hidden;
 }
-.gg-profile-avatar-frame img {
+.gg-profile-avatar-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gg-profile-avatar-fallback {
   width: 44px;
   height: 44px;
+}
+.gg-profile-avatar-frame.is-clickable {
+  cursor: pointer;
+}
+.gg-profile-avatar-edit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 18px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.gg-profile-avatar-frame.is-clickable:hover .gg-profile-avatar-edit,
+.gg-profile-avatar-frame.is-clickable:focus-visible .gg-profile-avatar-edit {
+  opacity: 1;
 }
 .gg-profile-info {
   flex: 1;
@@ -473,33 +499,19 @@ input, textarea {
 .gg-tool-item.is-active .gg-tool-item-status {
   filter: brightness(1.2);
 }
-.gg-tool-item-icon {
+.gg-tool-item-name {
+  flex: 1;
+}
+.gg-tool-item-status {
   display: inline-block;
   width: 18px;
   height: 18px;
   flex-shrink: 0;
   background-image: url("/spritesheet.png");
   background-repeat: no-repeat;
-  background-position: -36px -18px; /* sprite: ai */
 }
-.gg-tool-item-name {
-  flex: 1;
-}
-.gg-tool-item-status {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1px solid #0a4a0a;
-  box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.5);
-}
-.gg-tool-item-status--on {
-  background: radial-gradient(circle at 30% 30%, var(--gg-green-light), var(--gg-green) 70%, #155a15 100%);
-  border-color: #0a4a0a;
-}
-.gg-tool-item-status--off {
-  background: radial-gradient(circle at 30% 30%, #ff9b9b, #d33a2a 70%, #6a0e08 100%);
-  border-color: #5a0a04;
-}
+.gg-tool-item-status--on  { background-position: -18px 0; } /* sprite: default */
+.gg-tool-item-status--off { background-position: 0 0;     } /* sprite: invisible */
 
 .gg-section-action {
   margin-left: auto;
@@ -680,6 +692,12 @@ input, textarea {
   font-size: 11px;
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
   position: relative;
+}
+.gg-chatwin-titlebar.is-clickable {
+  cursor: pointer;
+}
+.gg-chatwin-titlebar.is-clickable:hover {
+  filter: brightness(1.08);
 }
 .gg-chatwin-titlebar::after {
   content: "";
@@ -2297,3 +2315,89 @@ input, textarea {
 [data-theme="dark"] .gg-friend-item:hover { background: #2c3a55; }
 [data-theme="dark"] .gg-friend-item { border-bottom-color: var(--xp-face-line); }
 [data-theme="dark"] .gg-friend-item.is-active { background: var(--xp-blue-3); }
+
+/* ── UserProfileDialog ─────────────────────────────────────────────── */
+.gg-userprofile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 320px;
+  max-width: 420px;
+}
+.gg-userprofile-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.gg-userprofile-avatar {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border: 1px solid #888272;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-inset-deep);
+  overflow: hidden;
+}
+.gg-userprofile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gg-userprofile-avatar img.gg-userprofile-avatar-fallback {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+.gg-userprofile-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.gg-userprofile-name {
+  font-size: 14px;
+  font-weight: 700;
+  word-break: break-all;
+}
+.gg-userprofile-nick {
+  font-size: 11px;
+  color: var(--text-mute);
+}
+.gg-userprofile-joined {
+  font-size: 11px;
+  color: var(--text-mute);
+  margin-top: 4px;
+}
+.gg-userprofile-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gg-userprofile-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-mute);
+}
+.gg-userprofile-desc {
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  padding: 6px 8px;
+  background: var(--xp-face-recess);
+  border: 1px solid var(--xp-face-line);
+  min-height: 48px;
+}
+.gg-userprofile-desc-empty {
+  color: var(--text-mute);
+  font-style: italic;
+}
+.gg-userprofile-desc-input {
+  resize: vertical;
+  font-family: inherit;
+  font-size: 12px;
+  min-height: 60px;
+}

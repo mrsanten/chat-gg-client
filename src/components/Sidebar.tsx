@@ -32,6 +32,10 @@ interface Props {
   description?: string;
   /** Wywoływane gdy user zmieni description; rodzic powinien debounce-ować save. */
   onDescriptionChange?: (description: string) => void;
+  /** Aktualny avatar usera (data URL). Pusty/undefined → fallback na sun.svg. */
+  avatar?: string;
+  /** Klik w ramkę avatara wywołuje to (rodzic odpala file picker, kompresuje, zapisuje). */
+  onChangeAvatar?: () => void;
 }
 
 export function Sidebar(props: Props) {
@@ -56,6 +60,8 @@ export function Sidebar(props: Props) {
     unreadByPeer,
     description,
     onDescriptionChange,
+    avatar,
+    onChangeAvatar,
   } = props;
 
   const [openTools, setOpenTools] = useState(true);
@@ -69,8 +75,23 @@ export function Sidebar(props: Props) {
     <aside className="gg-sidebar">
       <div className="gg-profile">
         <div className="gg-profile-avatar">
-          <div className="gg-profile-avatar-frame">
-            <img src={sunIcon} alt="" />
+          <div
+            className={`gg-profile-avatar-frame${onChangeAvatar ? " is-clickable" : ""}`}
+            onClick={onChangeAvatar}
+            role={onChangeAvatar ? "button" : undefined}
+            title={onChangeAvatar ? "Zmień avatar" : undefined}
+            tabIndex={onChangeAvatar ? 0 : undefined}
+          >
+            {avatar && avatar.length > 0 ? (
+              <img src={avatar} alt="" className="gg-profile-avatar-photo" />
+            ) : (
+              <img src={sunIcon} alt="" className="gg-profile-avatar-fallback" />
+            )}
+            {onChangeAvatar && (
+              <span className="gg-profile-avatar-edit" aria-hidden>
+                ✎
+              </span>
+            )}
           </div>
         </div>
         <div className="gg-profile-info">
@@ -98,30 +119,6 @@ export function Sidebar(props: Props) {
           />
         </div>
       </div>
-
-      <Section
-        title="Narzędzia (CLI)"
-        open={openTools}
-        onToggle={() => setOpenTools((v) => !v)}
-      >
-        {models.map((m) => {
-          const ok = configuredByModel[m.id] === true;
-          return (
-            <div
-              key={m.id}
-              className={`gg-tool-item${m.id === activeModelId && !activePeerUsername ? " is-active" : ""}`}
-              onClick={() => onSelectModel(m.id)}
-            >
-              <span className="gg-tool-item-icon" aria-hidden />
-              <span className="gg-tool-item-name">{m.name}</span>
-              <span
-                className={`gg-tool-item-status ${ok ? "gg-tool-item-status--on" : "gg-tool-item-status--off"}`}
-                title={ok ? "Skonfigurowane" : "Brak konfiguracji - otwórz Ustawienia"}
-              />
-            </div>
-          );
-        })}
-      </Section>
 
       {networkLoggedIn && (
         <Section
@@ -206,6 +203,30 @@ export function Sidebar(props: Props) {
           })}
         </Section>
       )}
+
+      <Section
+        title="Narzędzia (CLI)"
+        open={openTools}
+        onToggle={() => setOpenTools((v) => !v)}
+      >
+        {models.map((m) => {
+          const ok = configuredByModel[m.id] === true;
+          return (
+            <div
+              key={m.id}
+              className={`gg-tool-item${m.id === activeModelId && !activePeerUsername ? " is-active" : ""}`}
+              onClick={() => onSelectModel(m.id)}
+            >
+              <span
+                className={`gg-tool-item-status ${ok ? "gg-tool-item-status--on" : "gg-tool-item-status--off"}`}
+                title={ok ? "Skonfigurowane" : "Brak konfiguracji - otwórz Ustawienia"}
+                aria-hidden
+              />
+              <span className="gg-tool-item-name">{m.name}</span>
+            </div>
+          );
+        })}
+      </Section>
 
       <Section
         title={`Historia${activeModel ? ` ${activeModel.name}` : ""}`}

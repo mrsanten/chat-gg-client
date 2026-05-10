@@ -62,6 +62,9 @@ pub struct Account {
     pub created_at: DateTime<Utc>,
     #[serde(default)]
     pub description: String,
+    /// Avatar jako data URL ("data:image/...;base64,..."). Pusty string = brak.
+    #[serde(default)]
+    pub avatar: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,6 +79,13 @@ struct AccountWithHash {
     password_hash: String,
     created_at: DateTime<Utc>,
     description: String,
+    avatar: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateAvatarReq {
+    /// Data URL (np. "data:image/jpeg;base64,..."). Pusty string = usuń avatar.
+    pub avatar: String,
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -94,7 +104,7 @@ pub async fn register(
         r#"
         INSERT INTO accounts (username, username_lower, password_hash)
         VALUES ($1, $2, $3)
-        RETURNING id, username, created_at, description
+        RETURNING id, username, created_at, description, avatar
         "#,
     )
     .bind(&req.username)
@@ -124,7 +134,7 @@ pub async fn login(
     let username_lower = req.username.to_lowercase();
     let row: AccountWithHash = sqlx::query_as(
         r#"
-        SELECT id, username, password_hash, created_at, description
+        SELECT id, username, password_hash, created_at, description, avatar
         FROM accounts
         WHERE username_lower = $1
         "#,
@@ -147,6 +157,7 @@ pub async fn login(
             username: row.username,
             created_at: row.created_at,
             description: row.description,
+            avatar: row.avatar,
         },
     }))
 }
@@ -166,7 +177,7 @@ pub async fn update_profile(
         UPDATE accounts
         SET description = $1
         WHERE id = $2
-        RETURNING id, username, created_at, description
+        RETURNING id, username, created_at, description, avatar
         "#,
     )
     .bind(&req.description)
@@ -178,10 +189,43 @@ pub async fn update_profile(
     Ok(Json(row))
 }
 
+pub async fn update_avatar(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(req): Json<UpdateAvatarReq>,
+) -> AppResult<Json<Account>> {
+    // Pusty string = usuń avatar. Inaczej musi być data URL z obrazkiem.
+    if !req.avatar.is_empty() && !req.avatar.starts_with("data:image/") {
+        return Err(AppError::BadRequest(
+            "avatar musi być data URL z obrazkiem (np. data:image/jpeg;base64,...)".into(),
+        ));
+    }
+    // ~300 KB twarda granica. Klient powinien wcześniej zmniejszyć.
+    if req.avatar.len() > 300 * 1024 {
+        return Err(AppError::BadRequest(
+            "Avatar jest za duży, max ~200 KB. Spróbuj mniejszego obrazka.".into(),
+        ));
+    }
+    let row: Account = sqlx::query_as(
+        r#"
+        UPDATE accounts
+        SET avatar = $1
+        WHERE id = $2
+        RETURNING id, username, created_at, description, avatar
+        "#,
+    )
+    .bind(&req.avatar)
+    .bind(user.account_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    Ok(Json(row))
+}
+
 pub async fn me(State(state): State<AppState>, user: AuthUser) -> AppResult<Json<Account>> {
     let account: Account = sqlx::query_as(
         r#"
-        SELECT id, username, created_at, description
+        SELECT id, username, created_at, description, avatar
         FROM accounts
         WHERE id = $1
         "#,

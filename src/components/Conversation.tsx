@@ -13,6 +13,8 @@ interface Props {
   peerUnread?: number;
   /** True gdy to czat z kontaktem (nie z AI) — włącza render emotek. */
   peerChat?: boolean;
+  /** Klik w nagłówek z avatarem peera otwiera profil. */
+  onPeerProfileClick?: () => void;
 }
 
 export function Conversation({
@@ -22,6 +24,7 @@ export function Conversation({
   peerPresence,
   peerUnread,
   peerChat,
+  onPeerProfileClick,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -46,7 +49,14 @@ export function Conversation({
 
   return (
     <div className="gg-chatwin">
-      <div className="gg-chatwin-titlebar">
+      <div
+        className={`gg-chatwin-titlebar${
+          peerPresence && onPeerProfileClick ? " is-clickable" : ""
+        }`}
+        onClick={peerPresence && onPeerProfileClick ? onPeerProfileClick : undefined}
+        role={peerPresence && onPeerProfileClick ? "button" : undefined}
+        title={peerPresence && onPeerProfileClick ? "Pokaż profil" : undefined}
+      >
         {peerPresence ? (
           <span className="gg-chatwin-titlebar-icon gg-friend-dot-wrap" aria-hidden>
             <span className={`gg-friend-dot ${presenceClass}`} />

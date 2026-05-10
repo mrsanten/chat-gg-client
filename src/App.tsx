@@ -12,6 +12,7 @@ import { UpdateToast } from "./components/UpdateToast";
 import { ChangelogDialog } from "./components/ChangelogDialog";
 import { NetworkAccountDialog } from "./components/NetworkAccountDialog";
 import { AddFriendDialog } from "./components/AddFriendDialog";
+import { UserProfileDialog } from "./components/UserProfileDialog";
 import * as serverApi from "./lib/serverApi";
 import type { ServerContact, HistoryEntry } from "./lib/serverApi";
 import {
@@ -121,6 +122,14 @@ export default function App() {
   const [addFriendOpen, setAddFriendOpen] = useState(false);
   const [contacts, setContacts] = useState<ServerContact[]>([]);
   const [myDescription, setMyDescription] = useState<string>("");
+  const [myAvatar, setMyAvatar] = useState<string>("");
+  const [myJoinedAt, setMyJoinedAt] = useState<string>("");
+  /** Modal profilu: "self" → mój profil; "peer" → peer po username; null → zamknięty. */
+  const [profileDialog, setProfileDialog] = useState<
+    | { mode: "self" }
+    | { mode: "peer"; username: string }
+    | null
+  >(null);
   const descSaveTimerRef = useRef<number | null>(null);
   /** Status presence który CLIENT sam sobie ustawia (online/afk). Server
    *  trzyma to w pamięci hub-a, my synchronizujemy idle-detectorem. */
@@ -207,6 +216,8 @@ export default function App() {
         try {
           const me = await serverApi.me(s.network.server_url, s.network.token);
           setMyDescription(me.description ?? "");
+          setMyAvatar(me.avatar ?? "");
+          setMyJoinedAt(me.created_at ?? "");
           await tryRestore(s, me.id);
           setNetBootState("logged_in");
         } catch (e) {
@@ -230,6 +241,8 @@ export default function App() {
                 await settingsLib.saveSettings(refreshed);
                 setSettings(refreshed);
                 setMyDescription(auth.account.description ?? "");
+                setMyAvatar(auth.account.avatar ?? "");
+                setMyJoinedAt(auth.account.created_at ?? "");
                 await tryRestore(refreshed, auth.account.id);
                 setNetBootState("logged_in");
               } catch (loginErr) {
@@ -1011,6 +1024,9 @@ export default function App() {
     setUnreadByPeer({});
     setTypingByPeer({});
     setMyDescription("");
+    setMyAvatar("");
+    setMyJoinedAt("");
+    setProfileDialog(null);
     if (descSaveTimerRef.current != null) {
       window.clearTimeout(descSaveTimerRef.current);
       descSaveTimerRef.current = null;
@@ -1019,6 +1035,36 @@ export default function App() {
     peerGroupRef.current.clear();
     groupPeerRef.current.clear();
     setNetBootState("needs_login");
+  };
+
+  // Ukryty input file do uploadu avatara — klikany imperatywnie z dialogu profilu.
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const triggerAvatarPicker = () => {
+    avatarFileInputRef.current?.click();
+  };
+  const onAvatarFilePicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // żeby ten sam plik dało się wybrać ponownie
+    if (!file) return;
+    if (!settings.network.token || !settings.network.server_url) return;
+    try {
+      const { prepareAvatarFromFile } = await import("./lib/avatar");
+      const { dataUrl } = await prepareAvatarFromFile(file);
+      setMyAvatar(dataUrl); // optymistycznie
+      const updated = await serverApi.updateAvatar(
+        settings.network.server_url,
+        settings.network.token,
+        dataUrl,
+      );
+      setMyAvatar(updated.avatar ?? "");
+    } catch (err) {
+      console.error("[avatar] upload failed:", err);
+      alert(
+        err instanceof Error
+          ? `Nie udało się zaktualizować avatara: ${err.message}`
+          : "Nie udało się zaktualizować avatara.",
+      );
+    }
   };
 
   /**
@@ -1275,6 +1321,12 @@ export default function App() {
           onDescriptionChange={
             settings.network?.token ? onDescriptionChange : undefined
           }
+          avatar={myAvatar}
+          onChangeAvatar={
+            settings.network?.token
+              ? () => setProfileDialog({ mode: "self" })
+              : undefined
+          }
         />
         <main className="gg-main">
           {activePeerUsername ? (
@@ -1326,6 +1378,9 @@ export default function App() {
                 })()}
                 peerUnread={unreadByPeer[activePeerUsername] ?? 0}
                 peerChat
+                onPeerProfileClick={() =>
+                  setProfileDialog({ mode: "peer", username: activePeerUsername })
+                }
               />
               <Composer
                 disabled={false}
@@ -1406,6 +1461,68 @@ export default function App() {
         onClose={() => setAddFriendOpen(false)}
         onAdded={onAddedFriend}
       />
+      <input
+        ref={avatarFileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={onAvatarFilePicked}
+      />
+      {profileDialog && (
+        <UserProfileDialog
+          open
+          mode={profileDialog.mode}
+          onClose={() => setProfileDialog(null)}
+          data={(() => {
+            if (profileDialog.mode === "self") {
+              return {
+                username: settings.network?.username ?? "",
+                description: myDescription,
+                avatar: myAvatar,
+                joinedAt: myJoinedAt,
+                presence:
+                  !settings.network?.token
+                    ? "logged_out"
+                    : wsStatus.kind === "connected"
+                      ? myStatus === "afk"
+                        ? "afk"
+                        : "online"
+                      : wsStatus.kind === "connecting" || wsStatus.kind === "reconnecting"
+                        ? "connecting"
+                        : "offline",
+              };
+            }
+            const peer = contacts.find(
+              (c) => c.username.toLowerCase() === profileDialog.username.toLowerCase(),
+            );
+            return {
+              username: profileDialog.username,
+              nickname: peer?.nickname ?? null,
+              description: peer?.description ?? "",
+              avatar: peer?.avatar ?? "",
+              joinedAt: peer?.created_at,
+              presence:
+                wsStatus.kind === "reconnecting" || wsStatus.kind === "connecting"
+                  ? "connecting"
+                  : !peer
+                    ? "offline"
+                    : peer.status === "afk"
+                      ? "afk"
+                      : peer.online
+                        ? "online"
+                        : "offline",
+            };
+          })()}
+          onChangeAvatar={
+            profileDialog.mode === "self" ? triggerAvatarPicker : undefined
+          }
+          onDescriptionChange={
+            profileDialog.mode === "self" && settings.network?.token
+              ? onDescriptionChange
+              : undefined
+          }
+        />
+      )}
       {pendingUpdate && (
         <UpdateToast
           pending={pendingUpdate}

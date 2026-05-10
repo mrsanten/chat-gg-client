@@ -11,6 +11,8 @@ export interface ServerAccount {
   username: string;
   created_at: string;
   description?: string;
+  /** Avatar jako data URL ("data:image/...;base64,..."). Pusty/brak = brak. */
+  avatar?: string;
 }
 
 export interface AuthResponse {
@@ -27,6 +29,8 @@ export interface ServerContact {
   /** Granularny status. Brak (stary serwer) → online jeśli `online=true`. */
   status?: "online" | "afk" | "offline";
   description?: string;
+  /** Avatar peera jako data URL. Pusty/brak = brak (renderujemy default). */
+  avatar?: string;
 }
 
 export interface ServerMessage {
@@ -182,6 +186,18 @@ export async function updateProfile(
   return request<ServerAccount>("PUT", serverUrl, "/me/profile", {
     token,
     body: { description },
+  });
+}
+
+/** PUT /me/avatar — aktualizuje avatar usera (data URL, max ~200 KB). */
+export async function updateAvatar(
+  serverUrl: string,
+  token: string,
+  avatar: string,
+): Promise<ServerAccount> {
+  return request<ServerAccount>("PUT", serverUrl, "/me/avatar", {
+    token,
+    body: { avatar },
   });
 }
 

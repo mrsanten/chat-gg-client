@@ -12,6 +12,19 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.13.1",
+    date: "2026-05-10",
+    notes: [
+      'Fix Windows build: skrypt `scripts/build-emotes.mjs` używał `URL.pathname`, który na Windowsie zwraca `/D:/...` z leading slashem; `path.join` potem dublował dysk w `D:\\D:\\a\\...` i wywalał ENOENT na write. Teraz `fileURLToPath` z `node:url`.',
+      'Avatary użytkowników: nowe pole `avatar` na koncie (data URL JPEG/PNG do ~200 KB). Klik w ramkę avatara w sidebar otwiera dialog profilu z przyciskiem „Zmień avatar" → file picker. Klient kompresuje obraz do 128×128 (JPEG q=0.85, PNG dla obrazów z alpha) przed wysyłką. Server: migracja `accounts.avatar`, endpoint `PUT /me/avatar` (waliduje data: prefix + 300 KB limit), pole zwracane przez `/me`, `/auth`, `/contacts`.',
+      'Dialog profilu użytkownika: pokazuje avatar 96×96, username, twój nick (dla peera), status presence, datę dołączenia po polsku i opis. Tryb self → opis edytowalny + przycisk „Zmień avatar". Tryb peer → read-only. Klik w nagłówek czatu z kontaktem otwiera profil peera; klik w avatar w sidebar otwiera własny profil.',
+      'Server: `ContactView.created_at` zwraca teraz `accounts.created_at` (data dołączenia peera do serwera) zamiast `contacts.created_at` (data dodania go do kontaktów). Bardziej użyteczne w profilu, nigdzie indziej w kliencie tego pola nie używamy.',
+      'Status narzędzi w „Narzędzia (CLI)" używa teraz spritesheetu: skonfigurowane → sprite `default` (uśmiechnięte słońce), niepodpięte → sprite `invisible`. 18×18 zamiast wcześniejszej kropki 10×10.',
+      'Sidebar: sekcja „Znajomi" przeniesiona nad „Narzędzia (CLI)".',
+      'AFK: próg nieaktywności obniżony z 5 min do 60 s.',
+    ],
+  },
+  {
     version: "0.13.0",
     date: "2026-05-10",
     notes: [

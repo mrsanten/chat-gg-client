@@ -20,6 +20,8 @@ pub struct ContactView {
     pub peer_id: Uuid,
     pub username: String,
     pub nickname: Option<String>,
+    /// Data dołączenia peera do serwera (a.created_at), nie data dodania
+    /// go do naszych kontaktów. Wyświetlamy w „Dołączył(a)" w profilu.
     pub created_at: DateTime<Utc>,
     pub online: bool,
     /// Status presence: online/afk/offline. Bardziej granularne niż `online`,
@@ -27,6 +29,8 @@ pub struct ContactView {
     pub status: PresenceStatus,
     /// Opis peera (jego self-description, max 200 znaków).
     pub description: String,
+    /// Avatar peera jako data URL ("data:image/...;base64,..."). Pusty = brak.
+    pub avatar: String,
 }
 
 #[derive(sqlx::FromRow)]
@@ -36,6 +40,7 @@ struct ContactRow {
     nickname: Option<String>,
     created_at: DateTime<Utc>,
     description: String,
+    avatar: String,
 }
 
 /// POST /contacts — dodaje znajomego po username. Tworzy parę wpisów
@@ -51,8 +56,8 @@ pub async fn add_contact(
         return Err(AppError::BadRequest("username jest wymagany".into()));
     }
     let peer_lower = req.username.to_lowercase();
-    let peer: (Uuid, String, String) = sqlx::query_as(
-        r#"SELECT id, username, description FROM accounts WHERE username_lower = $1"#,
+    let peer: (Uuid, String, String, String, DateTime<Utc>) = sqlx::query_as(
+        r#"SELECT id, username, description, avatar, created_at FROM accounts WHERE username_lower = $1"#,
     )
     .bind(&peer_lower)
     .fetch_optional(&state.db)
@@ -106,10 +111,11 @@ pub async fn add_contact(
         peer_id: peer.0,
         username: peer.1,
         nickname: req.nickname,
-        created_at: Utc::now(),
+        created_at: peer.4,
         online,
         status,
         description: peer.2,
+        avatar: peer.3,
     };
     Ok((StatusCode::CREATED, Json(view)))
 }
@@ -121,7 +127,7 @@ pub async fn list_contacts(
 ) -> AppResult<Json<Vec<ContactView>>> {
     let rows: Vec<ContactRow> = sqlx::query_as(
         r#"
-        SELECT c.peer_id, a.username, c.nickname, c.created_at, a.description
+        SELECT c.peer_id, a.username, c.nickname, a.created_at, a.description, a.avatar
         FROM contacts c
         JOIN accounts a ON a.id = c.peer_id
         WHERE c.owner_id = $1
@@ -149,6 +155,7 @@ pub async fn list_contacts(
             online,
             status,
             description: r.description,
+            avatar: r.avatar,
         });
     }
     Ok(Json(out))
