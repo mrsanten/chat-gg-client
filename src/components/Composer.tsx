@@ -11,6 +11,12 @@ interface Props {
   onToggleSessionMacro?: (id: string) => void;
   onSend: (text: string, images: ImageAttachment[]) => void;
   onStop?: () => void;
+  /**
+   * Callback do trackingu pisania. `true` gdy user zaczął pisać po przerwie,
+   * `false` gdy idle 3s lub wysłał wiadomość. Phase 6: peer chat — wpinamy
+   * to do WebSocket `typing` event.
+   */
+  onTypingChange?: (typing: boolean) => void;
 }
 
 const MAX_IMAGES = 6;
@@ -23,11 +29,46 @@ export function Composer({
   onToggleSessionMacro,
   onSend,
   onStop,
+  onTypingChange,
 }: Props) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<ImageAttachment[]>([]);
   const ref = useRef<HTMLTextAreaElement>(null);
   const pendingCaretRef = useRef<number | null>(null);
+  const typingActiveRef = useRef(false);
+  const typingTimerRef = useRef<number | null>(null);
+
+  const stopTyping = () => {
+    if (typingTimerRef.current != null) {
+      window.clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+    if (typingActiveRef.current) {
+      typingActiveRef.current = false;
+      onTypingChange?.(false);
+    }
+  };
+
+  const noteKeystroke = () => {
+    if (!onTypingChange) return;
+    if (!typingActiveRef.current) {
+      typingActiveRef.current = true;
+      onTypingChange(true);
+    }
+    if (typingTimerRef.current != null) window.clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = window.setTimeout(stopTyping, 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current != null) window.clearTimeout(typingTimerRef.current);
+      if (typingActiveRef.current) {
+        typingActiveRef.current = false;
+        onTypingChange?.(false);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!disabled) ref.current?.focus();
@@ -56,6 +97,7 @@ export function Composer({
   const submit = () => {
     const trimmed = text.trim();
     if ((!trimmed && images.length === 0) || disabled) return;
+    stopTyping();
     onSend(trimmed, images);
     setText("");
     setImages([]);
@@ -175,7 +217,12 @@ export function Composer({
           className="gg-composer-input"
           rows={2}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (e.target.value.length > 0) noteKeystroke();
+            else stopTyping();
+          }}
+          onBlur={stopTyping}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
           placeholder={

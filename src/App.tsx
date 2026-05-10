@@ -116,6 +116,10 @@ export default function App() {
   const [activePeerUsername, setActivePeerUsername] = useState<string | null>(null);
   const [peerMessagesByPeer, setPeerMessagesByPeer] = useState<Record<string, PeerMessage[]>>({});
   const [wsStatus, setWsStatus] = useState<ConnectionStatus>({ kind: "idle" });
+  const [typingByPeer, setTypingByPeer] = useState<Record<string, boolean>>({});
+  const typingTimersRef = useRef<Map<string, number>>(new Map());
+  const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
+  const activePeerUsernameRef = useRef<string | null>(null);
   const networkRef = useRef<NetworkClient | null>(null);
   const historyLoadedFor = useRef<Set<string>>(new Set());
   // Phase 3D: mapping peer_username → group_id_b64. Populowany przy
@@ -224,6 +228,9 @@ export default function App() {
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       if (noticeTimerRef.current != null) window.clearTimeout(noticeTimerRef.current);
+      // Wyczyść typing-timery przy unmount.
+      for (const t of typingTimersRef.current.values()) window.clearTimeout(t);
+      typingTimersRef.current.clear();
       abortRef.current?.abort();
     };
   }, []);
@@ -233,6 +240,10 @@ export default function App() {
   useEffect(() => {
     pendingUpdateRef.current = pendingUpdate;
   }, [pendingUpdate]);
+
+  useEffect(() => {
+    activePeerUsernameRef.current = activePeerUsername;
+  }, [activePeerUsername]);
 
   const onInstallUpdate = async () => {
     if (!pendingUpdate) return;
@@ -525,6 +536,29 @@ export default function App() {
         );
         break;
       }
+      case "typing": {
+        // Auto-expire po 6s na wypadek gdyby peer się rozłączył w trakcie
+        // pisania (server normalnie wysłałby presence offline → typing
+        // implicit stop, ale to defense in depth).
+        if (event.state === "start") {
+          setTypingByPeer((prev) => ({ ...prev, [event.from]: true }));
+          const existing = typingTimersRef.current.get(event.from);
+          if (existing != null) window.clearTimeout(existing);
+          const t = window.setTimeout(() => {
+            setTypingByPeer((prev) => ({ ...prev, [event.from]: false }));
+            typingTimersRef.current.delete(event.from);
+          }, 6000);
+          typingTimersRef.current.set(event.from, t);
+        } else {
+          setTypingByPeer((prev) => ({ ...prev, [event.from]: false }));
+          const existing = typingTimersRef.current.get(event.from);
+          if (existing != null) {
+            window.clearTimeout(existing);
+            typingTimersRef.current.delete(event.from);
+          }
+        }
+        break;
+      }
       case "message": {
         const peer = event.from;
         const msg: PeerMessage = {
@@ -540,6 +574,9 @@ export default function App() {
           if (cur.some((m) => m.id === msg.id)) return prev;
           return { ...prev, [peer]: [...cur, msg] };
         });
+        if (activePeerUsernameRef.current !== peer) {
+          setUnreadByPeer((prev) => ({ ...prev, [peer]: (prev[peer] ?? 0) + 1 }));
+        }
         playNotify();
         break;
       }
@@ -622,12 +659,16 @@ export default function App() {
               body: resp.plaintext,
               created_at: event.created_at,
               pending: false,
+              e2e: true,
             };
             setPeerMessagesByPeer((prev) => {
               const cur = prev[peer] ?? [];
               if (cur.some((m) => m.id === msg.id)) return prev;
               return { ...prev, [peer]: [...cur, msg] };
             });
+            if (activePeerUsernameRef.current !== peer) {
+              setUnreadByPeer((prev) => ({ ...prev, [peer]: (prev[peer] ?? 0) + 1 }));
+            }
             playNotify();
           } catch (e) {
             console.error("[mls] decrypt failed:", e);
@@ -695,6 +736,10 @@ export default function App() {
       setIsStreaming(false);
     }
     setActivePeerUsername(username);
+    setUnreadByPeer((prev) => {
+      if ((prev[username] ?? 0) === 0) return prev;
+      return { ...prev, [username]: 0 };
+    });
     void ensurePeerHistoryLoaded(username);
   };
 
@@ -712,6 +757,7 @@ export default function App() {
       body: trimmed,
       created_at: new Date().toISOString(),
       pending: true,
+      e2e: true,
     };
     setPeerMessagesByPeer((prev) => {
       const cur = prev[peer] ?? [];
@@ -954,7 +1000,15 @@ export default function App() {
           onSelectSession={onSelectSession}
           onNewSession={onNewSession}
           onDeleteSession={onDeleteSession}
-          nick={settings.profile?.nick}
+          nick={
+            // Po zalogowaniu na serwer GAIdu używamy network.username jako
+            // główną tożsamość (to taki nasz „GG-numerek"). Lokalny nick
+            // z ProfileDialog dalej żyje jako fallback dla offline-only
+            // użytkowników, którzy nigdy nie zakładają konta sieciowego.
+            settings.network?.username ||
+            settings.profile?.nick ||
+            undefined
+          }
           onEditProfile={() => {
             setProfileForcedFirstRun(false);
             setProfileOpen(true);
@@ -965,6 +1019,7 @@ export default function App() {
           onSelectPeer={onSelectPeer}
           onAddFriend={() => setAddFriendOpen(true)}
           onRemoveFriend={onRemoveFriend}
+          unreadByPeer={unreadByPeer}
         />
         <main className="gg-main">
           {activePeerUsername ? (
@@ -981,11 +1036,13 @@ export default function App() {
                   activePeerUsername,
                 )}
                 sessionTitle={
-                  wsStatus.kind === "connected"
-                    ? "online"
-                    : wsStatus.kind === "reconnecting"
-                      ? "łączenie…"
-                      : "offline"
+                  typingByPeer[activePeerUsername]
+                    ? "pisze…"
+                    : wsStatus.kind === "connected"
+                      ? "online"
+                      : wsStatus.kind === "reconnecting"
+                        ? "łączenie…"
+                        : "offline"
                 }
               />
               <Composer
@@ -993,6 +1050,14 @@ export default function App() {
                 isStreaming={false}
                 onSend={(text) => {
                   void onPeerSend(text);
+                }}
+                onTypingChange={(typing) => {
+                  if (!activePeerUsername || !networkRef.current) return;
+                  networkRef.current.send({
+                    type: "typing",
+                    to: activePeerUsername,
+                    state: typing ? "start" : "stop",
+                  });
                 }}
               />
             </>
@@ -1087,6 +1152,8 @@ interface PeerMessage {
   created_at: string;
   pending?: boolean;
   errored?: boolean;
+  /** True gdy wiadomość przeszła przez MLS encrypt/decrypt. False/undef = legacy plain. */
+  e2e?: boolean;
 }
 
 function fmtPeerTime(iso: string): string {
@@ -1109,6 +1176,7 @@ function peerToChatMessages(list: PeerMessage[], peerUsername: string): ChatMess
     timestamp: fmtPeerTime(m.created_at),
     streaming: false,
     errored: m.errored,
+    e2e: m.e2e,
   }));
 }
 
