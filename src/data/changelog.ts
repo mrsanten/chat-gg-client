@@ -18,6 +18,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Fix: ack wiadomości WS (welcome/blob/message) dochodzi teraz dopiero PO sukcesie przetworzenia. Wcześniej szedł od razu, więc gdy decrypt/process_welcome rzucał, server marks delivered i wiadomość znikała z queue na zawsze. To powodowało że gdy klient przywital się z bug-iem (v0.9.0–v0.9.1 stale closure), Welcome z tamtych czasów byly tracone bezpowrotnie i kazdy kolejny blob od tego peera dawal 'grupa nie istnieje'.",
       "Komunikat błędu deszyfrowania: zamiast technicznego stack trace pokazujemy hint po polsku: „[E2E rozjechany — usuń tego znajomego i dodaj ponownie, żeby przywrócić rozmowę]”.",
       "Usunięcie znajomego czyści też lokalny cache grupy MLS, listę wiadomości i licznik nieprzeczytanych. Pozwala to ręcznie naprawić rozjechaną rozmowę poprzez delete + add (Welcome poleci od nowa).",
+      'Status pod nickiem w panelu bocznym pokazuje teraz realny stan połączenia z siecią GAIdu (Dostępny / Łączenie… / Brak połączenia / Niezalogowany), zamiast hardcoded „Dostępny".',
     ],
   },
   {

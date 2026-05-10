@@ -1112,6 +1112,15 @@ export default function App() {
             settings.profile?.nick ||
             undefined
           }
+          presence={
+            !settings.network?.token
+              ? "logged_out"
+              : wsStatus.kind === "connected"
+                ? "online"
+                : wsStatus.kind === "connecting" || wsStatus.kind === "reconnecting"
+                  ? "connecting"
+                  : "offline"
+          }
           onEditProfile={() => {
             setProfileForcedFirstRun(false);
             setProfileOpen(true);
