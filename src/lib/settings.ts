@@ -35,13 +35,19 @@ function mergeDefaults(s: Partial<Settings> | null | undefined): Settings {
       nick: typeof s.profile?.nick === "string" ? s.profile.nick : "",
     },
     network: {
-      server_url:
-        typeof s.network?.server_url === "string" && s.network.server_url
-          ? s.network.server_url
-          : "http://localhost:8080",
+      // Server URL jest hardcoded — UI nie pozwala go zmienić. Każde stare
+      // settings.json (np. z http://localhost:8080 z dev-a) snapuje się
+      // do produkcyjnej instancji przy najbliższym wczytaniu.
+      server_url: PRODUCTION_SERVER_URL,
       token: typeof s.network?.token === "string" ? s.network.token : "",
       account_id: s.network?.account_id ?? null,
       username: s.network?.username ?? null,
     },
   };
 }
+
+/**
+ * Adres produkcyjnego serwera GAIdu. Trzymany centralnie, importowany przez
+ * `mergeDefaults` (force-set) i przez `DEFAULT_SETTINGS` w types.ts.
+ */
+export const PRODUCTION_SERVER_URL = "https://gg.jacula.cloud";

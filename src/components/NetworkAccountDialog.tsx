@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import sunIcon from "../assets/sun.svg";
-import { saveSettings } from "../lib/settings";
+import { PRODUCTION_SERVER_URL, saveSettings } from "../lib/settings";
 import * as serverApi from "../lib/serverApi";
 import type { Settings } from "../types";
 
@@ -14,44 +14,35 @@ interface Props {
 type Mode = "login" | "register";
 
 export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props) {
-  const [serverUrl, setServerUrl] = useState(settings.network.server_url);
   const [mode, setMode] = useState<Mode>("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [serverProbe, setServerProbe] = useState<"unknown" | "ok" | "down">("unknown");
+
+  // Adres serwera trzymamy centralnie, user nie wybiera. Single instance.
+  const serverUrl = PRODUCTION_SERVER_URL;
 
   useEffect(() => {
     if (!open) return;
-    setServerUrl(settings.network.server_url);
     setMode("login");
     setUsername("");
     setPassword("");
     setShowPassword(false);
     setErr(null);
-    setServerProbe("unknown");
-  }, [open, settings.network.server_url]);
+  }, [open]);
 
   if (!open) return null;
 
   const isLoggedIn = settings.network.token.length > 0 && !!settings.network.username;
 
-  const probeServer = async () => {
-    setServerProbe("unknown");
-    const normalized = serverApi.normalizeServerUrl(serverUrl);
-    setServerUrl(normalized);
-    const ok = await serverApi.healthz(normalized);
-    setServerProbe(ok ? "ok" : "down");
-  };
-
-  const persistAuth = async (resp: serverApi.AuthResponse, normalizedUrl: string) => {
+  const persistAuth = async (resp: serverApi.AuthResponse) => {
     const next: Settings = {
       ...settings,
       network: {
         ...settings.network,
-        server_url: normalizedUrl,
+        server_url: serverUrl,
         token: resp.token,
         account_id: resp.account.id,
         username: resp.account.username,
@@ -67,15 +58,13 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
       setErr("Username i hasło są wymagane.");
       return;
     }
-    const normalized = serverApi.normalizeServerUrl(serverUrl);
-    setServerUrl(normalized);
     setBusy(true);
     try {
       const resp =
         mode === "login"
-          ? await serverApi.login(normalized, username.trim(), password)
-          : await serverApi.register(normalized, username.trim(), password);
-      await persistAuth(resp, normalized);
+          ? await serverApi.login(serverUrl, username.trim(), password)
+          : await serverApi.register(serverUrl, username.trim(), password);
+      await persistAuth(resp);
       onClose();
     } catch (e) {
       const msg =
@@ -134,7 +123,7 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
                   <strong>{settings.network.username}</strong>
                 </p>
                 <p className="gg-hint">
-                  Serwer: <code>{settings.network.server_url}</code>
+                  Serwer: <code>{serverUrl}</code>
                 </p>
                 <p className="gg-hint">
                   Po wylogowaniu sesja jest tylko czyszczona lokalnie. Token JWT
@@ -146,29 +135,10 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
           ) : (
             <>
               <fieldset className="gg-fieldset">
-                <legend>Serwer</legend>
-                <div className="gg-field">
-                  <input
-                    type="text"
-                    className="gg-text-input"
-                    placeholder="http://localhost:8080"
-                    value={serverUrl}
-                    onChange={(e) => setServerUrl(e.target.value)}
-                  />
-                  <button type="button" className="gg-mini-btn" onClick={probeServer} disabled={busy}>
-                    Sprawdź
-                  </button>
-                </div>
-                {serverProbe === "ok" && (
-                  <p className="gg-hint">✓ Serwer odpowiada na /healthz.</p>
-                )}
-                {serverProbe === "down" && (
-                  <p className="gg-error">Serwer nie odpowiada (network/CORS/down).</p>
-                )}
-              </fieldset>
-
-              <fieldset className="gg-fieldset">
                 <legend>{mode === "login" ? "Logowanie" : "Rejestracja"}</legend>
+                <p className="gg-hint">
+                  Serwer: <code>{serverUrl}</code>
+                </p>
                 <div className="gg-field">
                   <input
                     type="text"

@@ -122,7 +122,7 @@ export const DEFAULT_SETTINGS: Settings = {
   macros: [],
   profile: { nick: "" },
   network: {
-    server_url: "http://localhost:8080",
+    server_url: "https://gg.jacula.cloud",
     token: "",
     account_id: null,
     username: null,

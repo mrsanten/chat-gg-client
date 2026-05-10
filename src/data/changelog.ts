@@ -12,6 +12,14 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.8.1",
+    date: "2026-05-09",
+    notes: [
+      "Adres serwera GAIdu (gg.jacula.cloud) jest na stałe wbudowany w klienta. Nie ma już pola edycji w dialogu Konto sieciowe — to upraszcza onboarding i likwiduje całą klasę błędów konfiguracyjnych.",
+      "Pusty response z serwera (HTTP 200, brak body) zamiast crashu pokazuje teraz czytelny komunikat z podpowiedzią.",
+    ],
+  },
+  {
     version: "0.8.0",
     date: "2026-05-09",
     notes: [
