@@ -1325,13 +1325,20 @@ input, textarea {
 }
 .gg-signal-bar {
   width: 2px;
+  background: #c8c8c8;
+  border: 1px solid #888;
+}
+.gg-signal-bar.is-active {
   background: var(--gg-green);
-  border: 1px solid #115911;
+  border-color: #115911;
 }
 .gg-signal-bar:nth-child(1) { height: 4px; }
 .gg-signal-bar:nth-child(2) { height: 6px; }
 .gg-signal-bar:nth-child(3) { height: 8px; }
 .gg-signal-bar:nth-child(4) { height: 10px; }
+.gg-statusbar-net--connecting   { color: var(--gg-orange); }
+.gg-statusbar-net--disconnected { color: #888; }
+.gg-statusbar-net--logged_out   { color: var(--text-mute); }
 
 /* ===== Modal ===== */
 

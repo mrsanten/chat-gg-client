@@ -42,6 +42,7 @@ function mergeDefaults(s: Partial<Settings> | null | undefined): Settings {
       token: typeof s.network?.token === "string" ? s.network.token : "",
       account_id: s.network?.account_id ?? null,
       username: s.network?.username ?? null,
+      password: typeof s.network?.password === "string" ? s.network.password : null,
     },
   };
 }

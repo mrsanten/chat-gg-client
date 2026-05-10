@@ -4,12 +4,13 @@ interface Props {
   onOpenSettings: () => void;
   onOpenMacros: () => void;
   onOpenNetwork: () => void;
+  onAddFriend: () => void;
   /** Czy WebSocket jest aktywny — kropka na ikonie. Phase 2B.3+. */
   networkOnline?: boolean;
 }
 
 const TOOLBAR_ITEMS: Array<{ icon: string; label: string; action: keyof Actions }> = [
-  { icon: "👤", label: "Dodaj", action: "noop" },
+  { icon: "👤", label: "Dodaj", action: "addFriend" },
   { icon: "🔍", label: "Szukaj", action: "noop" },
   { icon: "🌐", label: "Sieć", action: "openNetwork" },
   { icon: "✦", label: "Makra", action: "openMacros" },
@@ -21,14 +22,22 @@ interface Actions {
   openSettings: () => void;
   openMacros: () => void;
   openNetwork: () => void;
+  addFriend: () => void;
 }
 
-export function Toolbar({ onOpenSettings, onOpenMacros, onOpenNetwork, networkOnline }: Props) {
+export function Toolbar({
+  onOpenSettings,
+  onOpenMacros,
+  onOpenNetwork,
+  onAddFriend,
+  networkOnline,
+}: Props) {
   const actions: Actions = {
     noop: () => {},
     openSettings: onOpenSettings,
     openMacros: onOpenMacros,
     openNetwork: onOpenNetwork,
+    addFriend: onAddFriend,
   };
 
   return (
