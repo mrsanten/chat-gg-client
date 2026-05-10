@@ -12,6 +12,13 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.11.1",
+    date: "2026-05-10",
+    notes: [
+      'Fix: nagłówek czatu z peerem pokazywał na sztywno „online" zamiast realnego statusu peera. Czytaliśmy nasz własny stan WS, a powinniśmy stan kontaktu (`contacts[].online`). Teraz pokazuje „online"/„offline" zgodnie z presence peer-a, „pisze…" gdy klepie odpowiedź, „łączenie…" gdy MY tracimy połączenie z serwerem.',
+    ],
+  },
+  {
     version: "0.11.0",
     date: "2026-05-10",
     notes: [

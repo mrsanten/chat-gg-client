@@ -1206,15 +1206,23 @@ export default function App() {
                   peerMessagesByPeer[activePeerUsername] ?? [],
                   activePeerUsername,
                 )}
-                sessionTitle={
-                  typingByPeer[activePeerUsername]
-                    ? "pisze…"
-                    : wsStatus.kind === "connected"
-                      ? "online"
-                      : wsStatus.kind === "reconnecting"
-                        ? "łączenie…"
-                        : "offline"
-                }
+                sessionTitle={(() => {
+                  // Status w nagłówku peer chat odzwierciedla obecność PEERA,
+                  // nie naszego klienta. Jeśli my sami nie jesteśmy
+                  // połączeni, pokazujemy tylko nasz stan (bo i tak nic
+                  // nie wiemy o peerze gdy WS jest down).
+                  if (wsStatus.kind === "reconnecting" || wsStatus.kind === "connecting") {
+                    return "łączenie…";
+                  }
+                  if (wsStatus.kind !== "connected") {
+                    return "brak połączenia";
+                  }
+                  if (typingByPeer[activePeerUsername]) return "pisze…";
+                  const peerContact = contacts.find(
+                    (c) => c.username.toLowerCase() === activePeerUsername.toLowerCase(),
+                  );
+                  return peerContact?.online ? "online" : "offline";
+                })()}
               />
               <Composer
                 disabled={false}
