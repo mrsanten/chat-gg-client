@@ -12,6 +12,15 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.9.5",
+    date: "2026-05-10",
+    notes: [
+      "Wiadomości peer-to-peer (E2E) są teraz cache-owane lokalnie po pierwszym zdeszyfrowaniu. Po restarcie apki widzisz całą historię tak jak przed wyłączeniem. Cache trzymany w localStorage per-account, sanityzowany (pending/tmp wiadomości pomijane).",
+      "Konfiguracja MLS: `max_past_epochs` zwiększone z domyślnego 0 do 1000 — openmls trzyma więcej historic key material, out-of-order delivery i ponowny decrypt w obrębie sesji są dużo bardziej tolerancyjne. Forward secrecy jest dalej (klucze poza window są nadal czyszczone), ale dla 1:1 hobby chat-u limit 1000 epok = praktycznie infinite.",
+      "UWAGA: nowe grupy (utworzone od v0.9.5) mają tę konfigurację. Stare grupy (z v0.8.0–v0.9.4) trzymają default 0 i nie odzyskają historii. Workaround: usuń znajomego + dodaj ponownie, zacznij rozmowę → nowa grupa, nowa cache.",
+    ],
+  },
+  {
     version: "0.9.4",
     date: "2026-05-09",
     notes: [

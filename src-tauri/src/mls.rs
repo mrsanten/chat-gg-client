@@ -329,6 +329,12 @@ fn group_config() -> MlsGroupCreateConfig {
         .wire_format_policy(PURE_CIPHERTEXT_WIRE_FORMAT_POLICY)
         .ciphersuite(CIPHERSUITE)
         .use_ratchet_tree_extension(true)
+        // Domyślnie openmls 0.8 trzyma 0 past epochs — czyli sekretne
+        // klucze poprzednich epok są kasowane po każdym Commit. To dobry
+        // default dla maximum forward secrecy, ale w naszym przypadku
+        // (mały hobby messenger) wolimy żeby user mógł przeczytać historię
+        // po restarcie apki. 1000 = praktycznie infinite dla 1:1 chats.
+        .max_past_epochs(1000)
         .build()
 }
 
