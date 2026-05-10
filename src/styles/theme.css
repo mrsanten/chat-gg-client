@@ -1831,3 +1831,264 @@ input, textarea {
   max-width: 80%;
   text-align: center;
 }
+
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║                          DARK THEME                                  ║
+   ║  Aktywowany przez data-theme="dark" na <html>. App.tsx ustawia      ║
+   ║  to na podstawie settings.theme; "system" pyta media query.          ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+
+[data-theme="dark"] {
+  /* XP face → dark grays */
+  --xp-face: #25252a;
+  --xp-face-2: #2d2d33;
+  --xp-face-shadow: #16161a;
+  --xp-face-light: #383840;
+  --xp-face-line: #3d3d45;
+
+  /* XP blue trochę przyciemniony — i tak ma kontrast wobec ciemnego tła */
+  --xp-blue-1: #2a5cdb;
+  --xp-blue-2: #2461d8;
+  --xp-blue-3: #0c41a7;
+  --xp-blue-deep: #082882;
+  --xp-blue-titlebar-1: #1d4dac;
+  --xp-blue-titlebar-2: #2562b8;
+  --xp-blue-titlebar-3: #062a78;
+
+  --gg-orange:    #ff8a00;
+  --gg-orange-2:  #ffb444;
+  --gg-yellow:    #ffd000;
+  --gg-green:     #4ad04a;
+  --gg-green-light: #6fdc6f;
+
+  --text:      #e6e6ea;
+  --text-mute: #a0a0a8;
+  --link:      #6fb8ff;
+  --code-bg:   #1a1a1e;
+
+  --shadow-inset-light: inset 1px 1px 0 #4a4a52, inset -1px -1px 0 #16161a;
+  --shadow-inset-deep:  inset 1px 1px 0 #16161a, inset -1px -1px 0 #4a4a52;
+}
+
+/* Hardcoded colory w komponentach — overrides per selector */
+[data-theme="dark"] body { color: var(--text); }
+
+[data-theme="dark"] .gg-window {
+  background: var(--xp-face);
+  border-color: #000;
+}
+
+[data-theme="dark"] .gg-toolbar {
+  background: linear-gradient(180deg, #2f2f36 0%, #25252a 50%, #1c1c20 100%);
+  border-bottom-color: #16161a;
+}
+[data-theme="dark"] .gg-toolbar-btn:hover {
+  border-color: #5a4a1e;
+  background: linear-gradient(180deg, #3d3520, #2a2310);
+}
+[data-theme="dark"] .gg-toolbar-btn:active {
+  background: linear-gradient(180deg, #2a2310, #3d3520);
+}
+[data-theme="dark"] .gg-toolbar-btn-label { color: var(--text); }
+
+[data-theme="dark"] .gg-menubar {
+  background: var(--xp-face);
+  border-bottom-color: var(--xp-face-line);
+  color: var(--text);
+}
+
+[data-theme="dark"] .gg-sidebar {
+  background: var(--xp-face);
+  border-right-color: var(--xp-face-shadow);
+}
+
+[data-theme="dark"] .gg-profile { border-bottom-color: var(--xp-face-line); }
+[data-theme="dark"] .gg-profile-name { color: var(--text); }
+[data-theme="dark"] .gg-profile-desc {
+  background: #1a1a1e;
+  border-color: #555;
+  color: var(--text);
+}
+[data-theme="dark"] .gg-profile-desc::placeholder { color: #777; }
+
+[data-theme="dark"] .gg-section-header { color: var(--text); }
+[data-theme="dark"] .gg-section-toggle { color: var(--text); }
+[data-theme="dark"] .gg-section-title  { color: var(--text); }
+[data-theme="dark"] .gg-section-count  { color: var(--text-mute); }
+
+[data-theme="dark"] .gg-tool-item:hover,
+[data-theme="dark"] .gg-session-item:hover {
+  background: #353540;
+}
+[data-theme="dark"] .gg-tool-item.is-active,
+[data-theme="dark"] .gg-session-item.is-active {
+  background: var(--xp-blue-3);
+  color: #fff;
+}
+
+[data-theme="dark"] .gg-history-empty { color: var(--text-mute); }
+
+[data-theme="dark"] .gg-section-action {
+  background: linear-gradient(180deg, #3a3a44 0%, #25252a 100%);
+  border-color: #16161a;
+  color: var(--text);
+}
+
+/* Conversation */
+[data-theme="dark"] .gg-main { background: var(--xp-face); }
+[data-theme="dark"] .gg-chatwin-titlebar { /* XP gradient zostaje */ }
+[data-theme="dark"] .gg-conversation { background: #1e1e22; }
+
+[data-theme="dark"] .gg-msg-bubble--ai {
+  background: #2f2f36;
+  color: var(--text);
+  border-color: #4a4a52;
+}
+[data-theme="dark"] .gg-msg-bubble--user {
+  background: #2a3f6e;
+  color: #f0f0f4;
+  border-color: #1a2a4d;
+}
+[data-theme="dark"] .gg-msg-author { color: #a0a0a8; }
+[data-theme="dark"] .gg-msg-time { color: var(--text-mute); }
+
+[data-theme="dark"] .gg-msg-copy {
+  background: #2a2a30;
+  color: var(--text-mute);
+  border-color: #555;
+}
+[data-theme="dark"] .gg-msg-copy:hover { background: #3a3a44; color: var(--text); }
+
+/* MessageBody markdown / code */
+[data-theme="dark"] .gg-msg pre,
+[data-theme="dark"] .gg-msg code { background: var(--code-bg); color: #e6e6ea; }
+[data-theme="dark"] .gg-msg blockquote { border-left-color: #555; color: var(--text-mute); }
+[data-theme="dark"] .gg-msg a { color: var(--link); }
+
+/* Composer */
+[data-theme="dark"] .gg-composer {
+  background: var(--xp-face);
+  border-top-color: var(--xp-face-shadow);
+}
+[data-theme="dark"] .gg-composer-input {
+  background: #1a1a1e;
+  border-color: #555;
+  color: var(--text);
+}
+[data-theme="dark"] .gg-composer-input::placeholder { color: #777; }
+
+/* Statusbar */
+[data-theme="dark"] .gg-statusbar {
+  background: var(--xp-face);
+  border-top-color: var(--xp-face-shadow);
+  color: var(--text);
+}
+[data-theme="dark"] .gg-statusbar-cell {
+  border-color: #444;
+  color: var(--text);
+}
+[data-theme="dark"] .gg-signal-bar { background: #555; border-color: #333; }
+[data-theme="dark"] .gg-signal-bar.is-active {
+  background: var(--gg-green);
+  border-color: #115911;
+}
+
+/* Modale */
+[data-theme="dark"] .gg-modal-backdrop { background: rgba(0,0,0,0.7); }
+[data-theme="dark"] .gg-modal { background: var(--xp-face); border-color: var(--xp-blue-deep); }
+[data-theme="dark"] .gg-modal-body { color: var(--text); }
+[data-theme="dark"] .gg-modal-actions { background: var(--xp-face); }
+
+[data-theme="dark"] .gg-fieldset {
+  border-color: #4a4a52;
+  background: var(--xp-face-2);
+}
+[data-theme="dark"] .gg-fieldset legend { color: var(--text); background: var(--xp-face-2); }
+[data-theme="dark"] .gg-text-input {
+  background: #1a1a1e;
+  border-color: #555;
+  color: var(--text);
+}
+[data-theme="dark"] .gg-text-input::placeholder { color: #777; }
+[data-theme="dark"] .gg-radio { color: var(--text); }
+[data-theme="dark"] .gg-hint { color: var(--text-mute); }
+[data-theme="dark"] .gg-error {
+  background: #3d1e1e;
+  border-color: #6e3030;
+  color: #ffb0b0;
+}
+[data-theme="dark"] .gg-mini-btn {
+  background: linear-gradient(180deg, #3a3a44 0%, #25252a 100%);
+  border-color: #555;
+  color: var(--text);
+}
+[data-theme="dark"] .gg-mini-btn:hover { background: linear-gradient(180deg, #45454f 0%, #2d2d35 100%); }
+
+[data-theme="dark"] .gg-btn {
+  background: linear-gradient(180deg, #3a3a44 0%, var(--xp-face) 50%, #1d1d22 100%);
+  border-color: #555;
+  color: var(--text);
+}
+[data-theme="dark"] .gg-btn:hover {
+  background: linear-gradient(180deg, #45454f 0%, #34343a 50%, #25252a 100%);
+}
+
+/* Menu dropdown */
+[data-theme="dark"] .gg-menu-dropdown {
+  background: var(--xp-face);
+  border-color: var(--xp-blue-deep);
+}
+[data-theme="dark"] .gg-menu-item { color: var(--text); }
+[data-theme="dark"] .gg-menu-sep { background: var(--xp-face-line); }
+
+/* Macro chips, friend ad, changelog, update toast — ogólny look */
+[data-theme="dark"] .gg-macro-chip,
+[data-theme="dark"] .gg-macro-toggle {
+  filter: brightness(0.9);
+  color: #1a1a1a;
+}
+[data-theme="dark"] .gg-macro-row,
+[data-theme="dark"] .gg-update-toast-notes,
+[data-theme="dark"] .gg-net-stat {
+  background: var(--xp-face-2);
+  border-color: #4a4a52;
+  color: var(--text);
+}
+[data-theme="dark"] .gg-changelog-version { color: #6fb8ff; }
+[data-theme="dark"] .gg-changelog-date { color: var(--text-mute); }
+[data-theme="dark"] .gg-changelog-list { color: var(--text); }
+[data-theme="dark"] .gg-changelog-entry { border-bottom-color: #4a4a52; }
+
+[data-theme="dark"] .gg-update-toast { background: var(--xp-face); border-color: var(--xp-blue-deep); }
+[data-theme="dark"] .gg-update-toast-version-old { color: #888; }
+[data-theme="dark"] .gg-update-toast-arrow { color: #888; }
+[data-theme="dark"] .gg-update-toast-version-new { color: #4ad04a; }
+[data-theme="dark"] .gg-update-toast-progress-bar { background: #1a1a1e; border-color: #555; }
+[data-theme="dark"] .gg-update-toast-progress-label { color: var(--text-mute); }
+
+[data-theme="dark"] .gg-update-notice { background: var(--xp-face); border-color: var(--xp-blue-deep); color: var(--text); }
+
+/* Sidebar Larry ad — żółta ramka pasuje też w darku, lekko stłumiona */
+[data-theme="dark"] .gg-sidebar-ad {
+  background: linear-gradient(180deg, #4d3f10 0%, #2f2606 100%);
+  border-color: #856414;
+}
+[data-theme="dark"] .gg-sidebar-ad-label { color: #ffd980; }
+[data-theme="dark"] .gg-sidebar-ad-text { color: #ffe6a8; }
+[data-theme="dark"] .gg-sidebar-ad-img { background: #000; border-color: #5a4a14; }
+
+/* Net dialog status */
+[data-theme="dark"] .gg-net-stat-label { color: var(--text-mute); }
+[data-theme="dark"] .gg-net-stat-value { color: var(--text); }
+[data-theme="dark"] .gg-ping-chart rect { fill: #1a1a1e; stroke: #4a4a52; }
+[data-theme="dark"] .gg-ping-chart text { fill: #888; }
+
+/* Profile status pod nickiem */
+[data-theme="dark"] .gg-profile-status--offline    { color: #777; }
+[data-theme="dark"] .gg-profile-status--logged_out { color: var(--text-mute); }
+
+/* Statusbar net stany */
+[data-theme="dark"] .gg-statusbar-net--disconnected { color: #888; }
+[data-theme="dark"] .gg-statusbar-net--logged_out   { color: var(--text-mute); }
+
+/* Conversation header subtitle/titlebar typing zostaje XP-blue */

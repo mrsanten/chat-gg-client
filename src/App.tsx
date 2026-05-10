@@ -310,6 +310,31 @@ export default function App() {
     };
   }, []);
 
+  // Theme: ustawiamy data-theme="dark"/"light" na <html>. CSS używa
+  // [data-theme="dark"] selectorów do nadpisania kolorów. Tryb "system"
+  // śledzi preferencję OS (matchMedia).
+  useEffect(() => {
+    const choice = settings.theme ?? "light";
+    const apply = () => {
+      let resolved: "light" | "dark";
+      if (choice === "system") {
+        resolved = window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+      } else {
+        resolved = choice;
+      }
+      document.documentElement.dataset.theme = resolved;
+    };
+    apply();
+    if (choice === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      const onChange = () => apply();
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    }
+  }, [settings.theme]);
+
   // Trzymaj refy w sync z aktualnym state'em, żeby callback z setIntervala
   // używał świeżych wartości bez wymuszania re-rejestracji.
   useEffect(() => {

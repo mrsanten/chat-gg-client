@@ -44,6 +44,10 @@ function mergeDefaults(s: Partial<Settings> | null | undefined): Settings {
       username: s.network?.username ?? null,
       password: typeof s.network?.password === "string" ? s.network.password : null,
     },
+    theme:
+      s.theme === "dark" || s.theme === "system" || s.theme === "light"
+        ? s.theme
+        : "light",
   };
 }
 

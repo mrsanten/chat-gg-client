@@ -11,6 +11,10 @@ pub struct Settings {
     pub macros: Vec<Macro>,
     pub profile: ProfileSettings,
     pub network: NetworkSettings,
+    /// "light" | "dark" | "system". Default "light". Trzymane jako string
+    /// (forward-compat — nieznane wartości lecą do default).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

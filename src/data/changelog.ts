@@ -12,6 +12,14 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.12.0",
+    date: "2026-05-10",
+    notes: [
+      'Ciemny motyw. W Ustawieniach nowa sekcja „Wygląd" z trzema opcjami: Jasny (XP Luna, default), Ciemny, Według systemu (śledzi preferencję OS). Ciemny przyciemnia tło, pasek narzędzi, sidebar, dialogi i bańki wiadomości; XP-blue titlebary zostają, bo i tak wyglądają OK na obu wariantach.',
+      'Tryb „Według systemu" reaguje na zmianę preferencji OS w czasie życia apki bez restartu (matchMedia listener).',
+    ],
+  },
+  {
     version: "0.11.1",
     date: "2026-05-10",
     notes: [

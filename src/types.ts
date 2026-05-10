@@ -122,6 +122,8 @@ export interface Settings {
   macros: Macro[];
   profile: ProfileSettings;
   network: NetworkSettings;
+  /** Motyw aplikacji. "system" śledzi preferencję OS. Default: "light". */
+  theme?: "light" | "dark" | "system";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -136,4 +138,5 @@ export const DEFAULT_SETTINGS: Settings = {
     account_id: null,
     username: null,
   },
+  theme: "light",
 };

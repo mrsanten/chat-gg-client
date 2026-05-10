@@ -327,6 +327,34 @@ export function SettingsDialog({ open, onClose, onSaved }: Props) {
                 )}
               </fieldset>
 
+              <fieldset className="gg-fieldset">
+                <legend>Wygląd</legend>
+                <label className="gg-radio">
+                  <input
+                    type="radio"
+                    checked={(settings.theme ?? "light") === "light"}
+                    onChange={() => setSettings((s) => ({ ...s, theme: "light" }))}
+                  />
+                  Jasny (XP Luna)
+                </label>
+                <label className="gg-radio">
+                  <input
+                    type="radio"
+                    checked={settings.theme === "dark"}
+                    onChange={() => setSettings((s) => ({ ...s, theme: "dark" }))}
+                  />
+                  Ciemny
+                </label>
+                <label className="gg-radio">
+                  <input
+                    type="radio"
+                    checked={settings.theme === "system"}
+                    onChange={() => setSettings((s) => ({ ...s, theme: "system" }))}
+                  />
+                  Według systemu
+                </label>
+              </fieldset>
+
               {err && <div className="gg-error">{err}</div>}
               <p className="gg-hint">
                 Sekrety zapisywane są lokalnie do pliku konfiguracyjnego apki (plain JSON, nie szyfrowane). Trzymaj komputer u siebie.
