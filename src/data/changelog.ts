@@ -12,6 +12,22 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.13.0",
+    date: "2026-05-10",
+    notes: [
+      'Profile description: nowe pole opisu pod nickiem (max 200 znaków, zapisuje się do bazy z debounce 500ms). Opis znajomych pokazuje się pod ich nickiem na liście kontaktów. Server: migracja `accounts.description`, endpoint `PUT /me/profile`, pole zwracane przez `/me`, `/auth/login`, `/auth/register`, `/contacts`.',
+      'Status AFK: po 60s nieaktywności (mouse/keyboard/touch/focus) klient sam ustawia status na AFK i informuje server. Każda aktywność cofa do Online. Server trzyma status per-account w hubie i broadcastuje peerom. Sidebar i nagłówek czatu z peerem pokazują dedykowany sprite AFK.',
+      'Nowy spritesheet GG-style (`public/spritesheet.png`) ze sprite-ami `online`/`offline`/`afk`/`unread`/`new-message`/`invisible`/`ai`. Stary `icons.png` usunięty, ikona statusu profilu i kropka znajomego ciągną teraz z nowego sheetu (18×18 zamiast 16×16).',
+      'Miganie unread: przy nieprzeczytanych wiadomościach kropka znajomego (sidebar) i ikona statusu peera (nagłówek czatu) migają między sprite-em statusu a sprite-em new-message (1s, hard step bez fade). Reset po wybraniu peera.',
+      'Nagłówek czatu z kontaktem: zamiast słońca pokazuje sprite presence peera (online/afk/offline/connecting). Status w tytule: „online"/„zaraz wraca"/„offline"/„pisze…"/„łączenie…". Usunięte placeholder przyciski min/max/close.',
+      'Sidebar: po wybraniu znajomego sesja AI i model w „Narzędziach (CLI)" przestają być oznaczone jako aktywne. Czarny pasek pod avatarem w profilu usunięty. Ikona narzędzia AI to teraz sprite `ai` zamiast słońca.',
+      "Toolbar: ikona aplikacji bez pomarańczowej obwódki/gradientu (flat 56×56).",
+      'Emotki GG7: 331 emotek z `emots.yetihehe.com` w `public/emotes/{1,2,3}/`. Trigger: `<nazwa>` (cz.1), `<nazwa2>` (cz.2), `<nazwa3>` (cz.3). Działają TYLKO w czatach z kontaktami (peer chat), nie z AI. Picker pod przyciskiem `:‑)` obok „Wyślij", 3 zakładki + filtr search. Render w wiadomościach jako inline `<img>` 18px wysokości.',
+      "Build: skrypt `scripts/build-emotes.mjs` skanuje katalogi i generuje `src/data/emotes.ts` z manifestem trigger → ścieżka. Wpięte w `pnpm dev` i `pnpm build`.",
+      "ProfileDialog deprecated: nick w sidebar nie jest już klikalny, używamy wyłącznie network.username. Dialog edycji nicku usunięty z bootu (force-first-run gate wycięty).",
+    ],
+  },
+  {
     version: "0.12.0",
     date: "2026-05-10",
     notes: [

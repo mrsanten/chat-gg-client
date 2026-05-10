@@ -60,6 +60,13 @@ pub struct Account {
     pub id: Uuid,
     pub username: String,
     pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    pub description: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateProfileReq {
+    pub description: String,
 }
 
 #[derive(sqlx::FromRow)]
@@ -68,6 +75,7 @@ struct AccountWithHash {
     username: String,
     password_hash: String,
     created_at: DateTime<Utc>,
+    description: String,
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -86,7 +94,7 @@ pub async fn register(
         r#"
         INSERT INTO accounts (username, username_lower, password_hash)
         VALUES ($1, $2, $3)
-        RETURNING id, username, created_at
+        RETURNING id, username, created_at, description
         "#,
     )
     .bind(&req.username)
@@ -116,7 +124,7 @@ pub async fn login(
     let username_lower = req.username.to_lowercase();
     let row: AccountWithHash = sqlx::query_as(
         r#"
-        SELECT id, username, password_hash, created_at
+        SELECT id, username, password_hash, created_at, description
         FROM accounts
         WHERE username_lower = $1
         "#,
@@ -138,14 +146,42 @@ pub async fn login(
             id: row.id,
             username: row.username,
             created_at: row.created_at,
+            description: row.description,
         },
     }))
+}
+
+pub async fn update_profile(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(req): Json<UpdateProfileReq>,
+) -> AppResult<Json<Account>> {
+    if req.description.chars().count() > 200 {
+        return Err(AppError::BadRequest(
+            "Opis nie może być dłuższy niż 200 znaków".into(),
+        ));
+    }
+    let row: Account = sqlx::query_as(
+        r#"
+        UPDATE accounts
+        SET description = $1
+        WHERE id = $2
+        RETURNING id, username, created_at, description
+        "#,
+    )
+    .bind(&req.description)
+    .bind(user.account_id)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    Ok(Json(row))
 }
 
 pub async fn me(State(state): State<AppState>, user: AuthUser) -> AppResult<Json<Account>> {
     let account: Account = sqlx::query_as(
         r#"
-        SELECT id, username, created_at
+        SELECT id, username, created_at, description
         FROM accounts
         WHERE id = $1
         "#,

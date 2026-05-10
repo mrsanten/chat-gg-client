@@ -1,11 +1,12 @@
 {
   "name": "tauri-app",
   "private": true,
-  "version": "0.12.0",
+  "version": "0.13.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "node scripts/build-emotes.mjs && vite",
+    "build": "node scripts/build-emotes.mjs && tsc && vite build",
+    "build:emotes": "node scripts/build-emotes.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

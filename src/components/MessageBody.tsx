@@ -2,13 +2,41 @@ import { Fragment, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { highlight } from "../lib/highlight";
+import { tokenizeEmotes } from "../lib/emotes";
 
 interface Props {
   text: string;
   streaming?: boolean;
+  /** Włącza render emotek `<name>`/`<name2>`/`<name3>` zamiast markdownu.
+   *  Dla peer chat (czat z człowiekiem) — true; AI chat — false (markdown). */
+  emotes?: boolean;
 }
 
-export function MessageBody({ text, streaming }: Props) {
+export function MessageBody({ text, streaming, emotes }: Props) {
+  if (emotes) {
+    // Plain text + emote substitution. Bez markdownu — peer chat to zwykły
+    // tekst, a `<jakiś_tag>` ma trafiać w nasz parser, nie w MD.
+    const tokens = tokenizeEmotes(text);
+    return (
+      <div className="gg-msg-body gg-msg-body--plain">
+        {tokens.map((t, i) =>
+          t.kind === "emote" ? (
+            <img
+              key={i}
+              className="gg-emote"
+              src={`/emotes/${t.value}`}
+              alt={`<${t.trigger}>`}
+              title={`<${t.trigger}>`}
+              loading="lazy"
+            />
+          ) : (
+            <Fragment key={i}>{t.value}</Fragment>
+          ),
+        )}
+        {streaming && <span className="gg-cursor" aria-hidden />}
+      </div>
+    );
+  }
   return (
     <div className="gg-msg-body">
       <ReactMarkdown

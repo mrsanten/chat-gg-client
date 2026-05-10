@@ -1,6 +1,7 @@
 use crate::auth::AuthUser;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
+use crate::ws::PresenceStatus;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -21,6 +22,11 @@ pub struct ContactView {
     pub nickname: Option<String>,
     pub created_at: DateTime<Utc>,
     pub online: bool,
+    /// Status presence: online/afk/offline. Bardziej granularne niż `online`,
+    /// stary klient ma czytać `online`, nowy `status`.
+    pub status: PresenceStatus,
+    /// Opis peera (jego self-description, max 200 znaków).
+    pub description: String,
 }
 
 #[derive(sqlx::FromRow)]
@@ -29,6 +35,7 @@ struct ContactRow {
     username: String,
     nickname: Option<String>,
     created_at: DateTime<Utc>,
+    description: String,
 }
 
 /// POST /contacts — dodaje znajomego po username. Tworzy parę wpisów
@@ -44,8 +51,8 @@ pub async fn add_contact(
         return Err(AppError::BadRequest("username jest wymagany".into()));
     }
     let peer_lower = req.username.to_lowercase();
-    let peer: (Uuid, String) = sqlx::query_as(
-        r#"SELECT id, username FROM accounts WHERE username_lower = $1"#,
+    let peer: (Uuid, String, String) = sqlx::query_as(
+        r#"SELECT id, username, description FROM accounts WHERE username_lower = $1"#,
     )
     .bind(&peer_lower)
     .fetch_optional(&state.db)
@@ -88,13 +95,21 @@ pub async fn add_contact(
     .await?;
     tx.commit().await?;
 
-    let online = state.hub.is_online(peer.0).await;
+    let status = state
+        .hub
+        .get_status(peer.0)
+        .await
+        .map(PresenceStatus::from)
+        .unwrap_or(PresenceStatus::Offline);
+    let online = !matches!(status, PresenceStatus::Offline);
     let view = ContactView {
         peer_id: peer.0,
         username: peer.1,
         nickname: req.nickname,
         created_at: Utc::now(),
         online,
+        status,
+        description: peer.2,
     };
     Ok((StatusCode::CREATED, Json(view)))
 }
@@ -106,7 +121,7 @@ pub async fn list_contacts(
 ) -> AppResult<Json<Vec<ContactView>>> {
     let rows: Vec<ContactRow> = sqlx::query_as(
         r#"
-        SELECT c.peer_id, a.username, c.nickname, c.created_at
+        SELECT c.peer_id, a.username, c.nickname, c.created_at, a.description
         FROM contacts c
         JOIN accounts a ON a.id = c.peer_id
         WHERE c.owner_id = $1
@@ -119,13 +134,21 @@ pub async fn list_contacts(
 
     let mut out = Vec::with_capacity(rows.len());
     for r in rows {
-        let online = state.hub.is_online(r.peer_id).await;
+        let status = state
+            .hub
+            .get_status(r.peer_id)
+            .await
+            .map(PresenceStatus::from)
+            .unwrap_or(PresenceStatus::Offline);
+        let online = !matches!(status, PresenceStatus::Offline);
         out.push(ContactView {
             peer_id: r.peer_id,
             username: r.username,
             nickname: r.nickname,
             created_at: r.created_at,
             online,
+            status,
+            description: r.description,
         });
     }
     Ok(Json(out))

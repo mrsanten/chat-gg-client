@@ -10,7 +10,6 @@ import { SettingsDialog } from "./components/Settings";
 import { MacrosDialog } from "./components/MacrosDialog";
 import { UpdateToast } from "./components/UpdateToast";
 import { ChangelogDialog } from "./components/ChangelogDialog";
-import { ProfileDialog } from "./components/ProfileDialog";
 import { NetworkAccountDialog } from "./components/NetworkAccountDialog";
 import { AddFriendDialog } from "./components/AddFriendDialog";
 import * as serverApi from "./lib/serverApi";
@@ -37,7 +36,6 @@ import {
   type DownloadStatus,
   type PendingUpdate,
 } from "./lib/updater";
-import { saveSettings } from "./lib/settings";
 import {
   deleteSession as deleteSessionRpc,
   deriveTitle,
@@ -108,8 +106,6 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [macrosOpen, setMacrosOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [profileForcedFirstRun, setProfileForcedFirstRun] = useState(false);
   const [networkOpen, setNetworkOpen] = useState(false);
   /**
    * Stan boot-a sieci. Ustawiamy w useEffect po sprawdzeniu tokena.
@@ -124,6 +120,11 @@ export default function App() {
   >("loading");
   const [addFriendOpen, setAddFriendOpen] = useState(false);
   const [contacts, setContacts] = useState<ServerContact[]>([]);
+  const [myDescription, setMyDescription] = useState<string>("");
+  const descSaveTimerRef = useRef<number | null>(null);
+  /** Status presence który CLIENT sam sobie ustawia (online/afk). Server
+   *  trzyma to w pamięci hub-a, my synchronizujemy idle-detectorem. */
+  const [myStatus, setMyStatus] = useState<"online" | "afk">("online");
   const [activePeerUsername, setActivePeerUsername] = useState<string | null>(null);
   const [peerMessagesByPeer, setPeerMessagesByPeer] = useState<Record<string, PeerMessage[]>>({});
   const [wsStatus, setWsStatus] = useState<ConnectionStatus>({ kind: "idle" });
@@ -184,10 +185,6 @@ export default function App() {
       const [s, sess] = await Promise.all([loadSettings(), listSessions()]);
       setSettings(s);
       setSessions(sess);
-      if (!s.profile?.nick || s.profile.nick.trim().length === 0) {
-        setProfileForcedFirstRun(true);
-        setProfileOpen(true);
-      }
       // Walidacja JWT przy starcie. Jeśli nieważny → wyczyść z settings,
       // żeby przy następnym otwarciu NetworkAccountDialog user widział
       // formularz logowania zamiast „już zalogowany".
@@ -209,6 +206,7 @@ export default function App() {
 
         try {
           const me = await serverApi.me(s.network.server_url, s.network.token);
+          setMyDescription(me.description ?? "");
           await tryRestore(s, me.id);
           setNetBootState("logged_in");
         } catch (e) {
@@ -231,6 +229,7 @@ export default function App() {
                 const settingsLib = await import("./lib/settings");
                 await settingsLib.saveSettings(refreshed);
                 setSettings(refreshed);
+                setMyDescription(auth.account.description ?? "");
                 await tryRestore(refreshed, auth.account.id);
                 setNetBootState("logged_in");
               } catch (loginErr) {
@@ -303,6 +302,7 @@ export default function App() {
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       if (noticeTimerRef.current != null) window.clearTimeout(noticeTimerRef.current);
+      if (descSaveTimerRef.current != null) window.clearTimeout(descSaveTimerRef.current);
       // Wyczyść typing-timery przy unmount.
       for (const t of typingTimersRef.current.values()) window.clearTimeout(t);
       typingTimersRef.current.clear();
@@ -344,6 +344,50 @@ export default function App() {
   useEffect(() => {
     activePeerUsernameRef.current = activePeerUsername;
   }, [activePeerUsername]);
+
+  // Idle detection: po 1 min bez aktywności (mouse/keyboard/touch/focus)
+  // przełączamy status na AFK i informujemy server. Każda aktywność
+  // resetuje timer; jeśli byliśmy AFK to wracamy na Online.
+  const myStatusRef = useRef(myStatus);
+  useEffect(() => {
+    myStatusRef.current = myStatus;
+  }, [myStatus]);
+  useEffect(() => {
+    const IDLE_MS = 60 * 1000;
+    let idleTimer: number | null = null;
+
+    const sendStatus = (status: "online" | "afk") => {
+      if (myStatusRef.current === status) return;
+      myStatusRef.current = status;
+      setMyStatus(status);
+      networkRef.current?.send({ type: "set_status", status });
+    };
+
+    const onActivity = () => {
+      if (idleTimer != null) window.clearTimeout(idleTimer);
+      // Po aktywności wracamy do online (jeśli byliśmy AFK).
+      sendStatus("online");
+      idleTimer = window.setTimeout(() => sendStatus("afk"), IDLE_MS);
+    };
+
+    const events: Array<keyof WindowEventMap> = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "wheel",
+      "focus",
+    ];
+    for (const e of events) window.addEventListener(e, onActivity, { passive: true });
+    // Start z aktywności — pierwszy timer od razu.
+    onActivity();
+
+    return () => {
+      if (idleTimer != null) window.clearTimeout(idleTimer);
+      for (const e of events) window.removeEventListener(e, onActivity);
+    };
+  }, []);
+
 
   // KLUCZOWE: WS listener jest rejestrowany RAZ przy mount, więc closure
   // capture'uje pierwszy render — settings.network.account_id = null
@@ -572,19 +616,6 @@ export default function App() {
     }
   };
 
-  const onSaveNick = async (nick: string) => {
-    const next: Settings = { ...settings, profile: { ...settings.profile, nick } };
-    await saveSettings(next);
-    setSettings(next);
-    setProfileOpen(false);
-    setProfileForcedFirstRun(false);
-  };
-
-  const onCancelProfile = () => {
-    if (profileForcedFirstRun) return;
-    setProfileOpen(false);
-  };
-
   // ─────────── NetworkClient lifecycle (Phase 2B.3)
 
   useEffect(() => {
@@ -638,9 +669,15 @@ export default function App() {
         break;
       }
       case "presence": {
+        // status: stary serwer go nie wyśle — derive z `online`. Nowy server
+        // zawsze daje online/afk/offline.
+        const derivedStatus =
+          event.status ?? (event.online ? "online" : "offline");
         setContacts((prev) =>
           prev.map((c) =>
-            c.username === event.username ? { ...c, online: event.online } : c,
+            c.username === event.username
+              ? { ...c, online: event.online, status: derivedStatus }
+              : c,
           ),
         );
         break;
@@ -973,10 +1010,38 @@ export default function App() {
     setPeerMessagesByPeer({});
     setUnreadByPeer({});
     setTypingByPeer({});
+    setMyDescription("");
+    if (descSaveTimerRef.current != null) {
+      window.clearTimeout(descSaveTimerRef.current);
+      descSaveTimerRef.current = null;
+    }
     historyLoadedFor.current.clear();
     peerGroupRef.current.clear();
     groupPeerRef.current.clear();
     setNetBootState("needs_login");
+  };
+
+  /**
+   * Aktualizuje opis profilu zalogowanego usera. Optymistyczna zmiana stanu
+   * lokalnego + debounce 500ms na PUT /me/profile, żeby nie spamić serwera
+   * przy każdym keystroke. Bez tokena (offline) tylko zmieniamy lokalny
+   * stan, ale i tak nie ma kogo informować, więc ignorujemy.
+   */
+  const onDescriptionChange = (desc: string) => {
+    setMyDescription(desc);
+    if (descSaveTimerRef.current != null) {
+      window.clearTimeout(descSaveTimerRef.current);
+    }
+    const token = settings.network?.token;
+    const serverUrl = settings.network?.server_url;
+    if (!token || !serverUrl) return;
+    descSaveTimerRef.current = window.setTimeout(() => {
+      void serverApi
+        .updateProfile(serverUrl, token, desc)
+        .catch((e) => {
+          console.warn("[network] updateProfile failed:", e);
+        });
+    }, 500);
   };
 
   const sessionMacroKey = activeSessionId ?? PENDING_SESSION_KEY;
@@ -1187,28 +1252,18 @@ export default function App() {
           onSelectSession={onSelectSession}
           onNewSession={onNewSession}
           onDeleteSession={onDeleteSession}
-          nick={
-            // Po zalogowaniu na serwer GAIdu używamy network.username jako
-            // główną tożsamość (to taki nasz „GG-numerek"). Lokalny nick
-            // z ProfileDialog dalej żyje jako fallback dla offline-only
-            // użytkowników, którzy nigdy nie zakładają konta sieciowego.
-            settings.network?.username ||
-            settings.profile?.nick ||
-            undefined
-          }
+          nick={settings.network?.username ?? undefined}
           presence={
             !settings.network?.token
               ? "logged_out"
               : wsStatus.kind === "connected"
-                ? "online"
+                ? myStatus === "afk"
+                  ? "afk"
+                  : "online"
                 : wsStatus.kind === "connecting" || wsStatus.kind === "reconnecting"
                   ? "connecting"
                   : "offline"
           }
-          onEditProfile={() => {
-            setProfileForcedFirstRun(false);
-            setProfileOpen(true);
-          }}
           networkLoggedIn={!!settings.network.token && !!settings.network.username}
           contacts={contacts}
           activePeerUsername={activePeerUsername}
@@ -1216,6 +1271,10 @@ export default function App() {
           onAddFriend={() => setAddFriendOpen(true)}
           onRemoveFriend={onRemoveFriend}
           unreadByPeer={unreadByPeer}
+          description={myDescription}
+          onDescriptionChange={
+            settings.network?.token ? onDescriptionChange : undefined
+          }
         />
         <main className="gg-main">
           {activePeerUsername ? (
@@ -1246,12 +1305,32 @@ export default function App() {
                   const peerContact = contacts.find(
                     (c) => c.username.toLowerCase() === activePeerUsername.toLowerCase(),
                   );
-                  return peerContact?.online ? "online" : "offline";
+                  if (!peerContact) return "offline";
+                  if (peerContact.status === "afk") return "zaraz wraca";
+                  return peerContact.online ? "online" : "offline";
                 })()}
+                peerPresence={(() => {
+                  if (
+                    wsStatus.kind === "reconnecting" ||
+                    wsStatus.kind === "connecting"
+                  ) {
+                    return "connecting";
+                  }
+                  if (wsStatus.kind !== "connected") return "offline";
+                  const peerContact = contacts.find(
+                    (c) => c.username.toLowerCase() === activePeerUsername.toLowerCase(),
+                  );
+                  if (!peerContact) return "offline";
+                  if (peerContact.status === "afk") return "afk";
+                  return peerContact.online ? "online" : "offline";
+                })()}
+                peerUnread={unreadByPeer[activePeerUsername] ?? 0}
+                peerChat
               />
               <Composer
                 disabled={false}
                 isStreaming={false}
+                enableEmotes
                 onSend={(text) => onPeerSend(text)}
                 onTypingChange={(typing) => {
                   if (!activePeerUsername || !networkRef.current) return;
@@ -1326,13 +1405,6 @@ export default function App() {
         token={settings.network.token}
         onClose={() => setAddFriendOpen(false)}
         onAdded={onAddedFriend}
-      />
-      <ProfileDialog
-        open={profileOpen}
-        initialNick={settings.profile?.nick ?? ""}
-        required={profileForcedFirstRun}
-        onSave={onSaveNick}
-        onCancel={onCancelProfile}
       />
       {pendingUpdate && (
         <UpdateToast

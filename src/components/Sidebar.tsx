@@ -14,12 +14,11 @@ interface Props {
   onNewSession: () => void;
   onDeleteSession: (id: string) => void;
   nick?: string;
-  onEditProfile?: () => void;
   /**
    * Status presencji do wyświetlenia pod nickiem. Komponuje się z stanem
    * sieciowym (zalogowany/łączenie/online).
    */
-  presence?: "online" | "connecting" | "offline" | "logged_out";
+  presence?: "online" | "afk" | "connecting" | "offline" | "logged_out";
   // Phase 2B.2: lista znajomych. Pokazujemy tylko gdy networkLoggedIn.
   networkLoggedIn?: boolean;
   contacts?: ServerContact[];
@@ -29,6 +28,10 @@ interface Props {
   onRemoveFriend?: (contact: ServerContact) => void;
   /** Mapa username -> liczba nieprzeczytanych. Reset gdy wybierzesz peera. */
   unreadByPeer?: Record<string, number>;
+  /** Opis z profilu zalogowanego usera (z serwera). Editowalny przez input. */
+  description?: string;
+  /** Wywoływane gdy user zmieni description; rodzic powinien debounce-ować save. */
+  onDescriptionChange?: (description: string) => void;
 }
 
 export function Sidebar(props: Props) {
@@ -43,7 +46,6 @@ export function Sidebar(props: Props) {
     onNewSession,
     onDeleteSession,
     nick,
-    onEditProfile,
     presence,
     networkLoggedIn,
     contacts,
@@ -52,12 +54,13 @@ export function Sidebar(props: Props) {
     onAddFriend,
     onRemoveFriend,
     unreadByPeer,
+    description,
+    onDescriptionChange,
   } = props;
 
   const [openTools, setOpenTools] = useState(true);
   const [openHistory, setOpenHistory] = useState(true);
   const [openFriends, setOpenFriends] = useState(true);
-  const [desc, setDesc] = useState("");
 
   const activeModel = models.find((m) => m.id === activeModelId);
   const modelSessions = sessions.filter((s) => s.modelId === activeModelId);
@@ -69,31 +72,29 @@ export function Sidebar(props: Props) {
           <div className="gg-profile-avatar-frame">
             <img src={sunIcon} alt="" />
           </div>
-          <div className="gg-profile-avatar-bar" aria-hidden />
         </div>
         <div className="gg-profile-info">
-          <div
-            className="gg-profile-name"
-            onClick={onEditProfile}
-            title={onEditProfile ? "Edytuj profil" : undefined}
-            role={onEditProfile ? "button" : undefined}
-          >
+          <div className="gg-profile-name">
             {nick && nick.trim().length > 0 ? nick : "Użytkownik"}
           </div>
           <div className={`gg-profile-status gg-profile-status--${presence ?? "logged_out"}`}>
             {presence === "online"
               ? "Dostępny"
-              : presence === "connecting"
-                ? "Łączenie…"
-                : presence === "offline"
-                  ? "Brak połączenia"
-                  : "Niezalogowany"}
+              : presence === "afk"
+                ? "Zaraz wracam"
+                : presence === "connecting"
+                  ? "Łączenie…"
+                  : presence === "offline"
+                    ? "Brak połączenia"
+                    : "Niezalogowany"}
           </div>
           <input
             className="gg-profile-desc"
             placeholder="Wpisz opis..."
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
+            value={description ?? ""}
+            maxLength={200}
+            onChange={(e) => onDescriptionChange?.(e.target.value)}
+            disabled={!onDescriptionChange}
           />
         </div>
       </div>
@@ -108,10 +109,10 @@ export function Sidebar(props: Props) {
           return (
             <div
               key={m.id}
-              className={`gg-tool-item${m.id === activeModelId ? " is-active" : ""}`}
+              className={`gg-tool-item${m.id === activeModelId && !activePeerUsername ? " is-active" : ""}`}
               onClick={() => onSelectModel(m.id)}
             >
-              <img src={sunIcon} alt="" className="gg-tool-item-icon" />
+              <span className="gg-tool-item-icon" aria-hidden />
               <span className="gg-tool-item-name">{m.name}</span>
               <span
                 className={`gg-tool-item-status ${ok ? "gg-tool-item-status--on" : "gg-tool-item-status--off"}`}
@@ -147,25 +148,47 @@ export function Sidebar(props: Props) {
           )}
           {contacts?.map((c) => {
             const unread = unreadByPeer?.[c.username] ?? 0;
+            const displayName =
+              c.nickname && c.nickname.trim().length > 0 ? c.nickname : c.username;
+            const peerDesc = c.description?.trim() ?? "";
             return (
               <div
                 key={c.peer_id}
-                className={`gg-session-item${activePeerUsername === c.username ? " is-active" : ""}`}
+                className={`gg-friend-item${activePeerUsername === c.username ? " is-active" : ""}`}
                 onClick={() => onSelectPeer?.(c.username)}
-                title={c.online ? "Online" : "Offline"}
+                title={
+                  peerDesc
+                    ? `${c.online ? "Online" : "Offline"}\n${peerDesc}`
+                    : c.online
+                      ? "Online"
+                      : "Offline"
+                }
               >
-                <span
-                  className={`gg-friend-dot ${c.online ? "gg-friend-dot--on" : "gg-friend-dot--off"}`}
-                  aria-hidden
-                />
-                <span className="gg-session-title">
-                  {c.nickname && c.nickname.trim().length > 0 ? c.nickname : c.username}
+                <span className="gg-friend-dot-wrap" aria-hidden>
+                  <span
+                    className={`gg-friend-dot ${
+                      c.status === "afk"
+                        ? "gg-friend-dot--afk"
+                        : c.online
+                          ? "gg-friend-dot--on"
+                          : "gg-friend-dot--off"
+                    }`}
+                  />
+                  {unread > 0 && (
+                    <span className="gg-friend-dot gg-friend-dot--unread gg-friend-dot--blink" />
+                  )}
                 </span>
-                {unread > 0 && (
-                  <span className="gg-friend-unread" title={`${unread} nieprzeczytane`}>
-                    {unread > 99 ? "99+" : unread}
-                  </span>
-                )}
+                <div className="gg-friend-text">
+                  <div className="gg-friend-row">
+                    <span className="gg-friend-name">{displayName}</span>
+                    {unread > 0 && (
+                      <span className="gg-friend-unread" title={`${unread} nieprzeczytane`}>
+                        {unread > 99 ? "99+" : unread}
+                      </span>
+                    )}
+                  </div>
+                  {peerDesc && <div className="gg-friend-desc">{peerDesc}</div>}
+                </div>
                 <button
                   type="button"
                   className="gg-session-del"
@@ -209,7 +232,7 @@ export function Sidebar(props: Props) {
         {modelSessions.map((s) => (
           <div
             key={s.id}
-            className={`gg-session-item${s.id === activeSessionId ? " is-active" : ""}`}
+            className={`gg-session-item${s.id === activeSessionId && !activePeerUsername ? " is-active" : ""}`}
             onClick={() => onSelectSession(s.id)}
           >
             <span className="gg-session-title">{s.title}</span>

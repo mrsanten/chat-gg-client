@@ -14,7 +14,7 @@
 //!   5. Pętla: receive `ClientEvent`, fan-out, persist.
 
 use crate::auth::jwt;
-use crate::hub::Connection;
+use crate::hub::{Connection, Status};
 use crate::state::AppState;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Query, State};
@@ -68,6 +68,9 @@ pub enum ClientEvent {
     },
     /// Pingi heartbeat (klient może wysyłać co 30s).
     Ping,
+    /// Klient ustawia własny status presence (online / afk).
+    /// Server broadcastuje peerom przez `Presence`.
+    SetStatus { status: Status },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -75,6 +78,26 @@ pub enum ClientEvent {
 pub enum TypingState {
     Start,
     Stop,
+}
+
+/// Wire-level status presence dla peerów: online/afk/offline.
+/// Online = aktywny i połączony. Afk = połączony ale nieaktywny od dłuższego
+/// czasu. Offline = brak połączenia.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PresenceStatus {
+    Online,
+    Afk,
+    Offline,
+}
+
+impl From<Status> for PresenceStatus {
+    fn from(s: Status) -> Self {
+        match s {
+            Status::Online => PresenceStatus::Online,
+            Status::Afk => PresenceStatus::Afk,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -104,10 +127,13 @@ pub enum ServerEvent {
         from: String,
         state: TypingState,
     },
-    /// Status online/offline znajomego.
+    /// Status presence znajomego: online/afk/offline. `online` zostawiamy dla
+    /// kompatybilności z klientami sprzed v0.13 (pre-AFK), nowy klient czyta
+    /// `status`.
     Presence {
         username: String,
         online: bool,
+        status: PresenceStatus,
     },
     /// Zaszyfrowana wiadomość MLS przyszła do tego usera.
     Blob {
@@ -207,9 +233,10 @@ async fn run_session(socket: WebSocket, state: AppState, account_id: Uuid, usern
     }
 
     // Jeśli właśnie przeszedł offline → online, broadcast presence do
-    // każdego, kto ma go w kontaktach.
+    // każdego, kto ma go w kontaktach. Default status = Online (świeży login
+    // zawsze startuje od Online — AFK reset w hub::unregister).
     if was_offline {
-        broadcast_presence(&state, account_id, &username, true).await;
+        broadcast_presence(&state, account_id, &username, true, PresenceStatus::Online).await;
     }
 
     // ── send-loop: czyta `rx` i wypycha do socketu
@@ -286,7 +313,7 @@ async fn run_session(socket: WebSocket, state: AppState, account_id: Uuid, usern
     // Cleanup. Jeśli to ostatnie połączenie tego usera, broadcast offline.
     let now_offline = state.hub.unregister(account_id, conn_id).await;
     if now_offline {
-        broadcast_presence(&state, account_id, &username, false).await;
+        broadcast_presence(&state, account_id, &username, false, PresenceStatus::Offline).await;
     }
 }
 
@@ -300,6 +327,19 @@ async fn handle_client_event(
     match ev {
         ClientEvent::Ping => {
             let _ = tx.send(ServerEvent::Pong).await;
+        }
+        ClientEvent::SetStatus { status } => {
+            // Aktualizuj hub. Jeśli się zmienił, broadcast peerom.
+            if let Some(new_status) = state.hub.set_status(sender_id, status).await {
+                broadcast_presence(
+                    state,
+                    sender_id,
+                    sender_username,
+                    true,
+                    new_status.into(),
+                )
+                .await;
+            }
         }
         ClientEvent::AckDelivery { message_id } => {
             // Best-effort, ignore błędu (klient może retransmitować ack).
@@ -839,7 +879,13 @@ async fn flush_offline_queue(
     Ok(())
 }
 
-async fn broadcast_presence(state: &AppState, account_id: Uuid, username: &str, online: bool) {
+async fn broadcast_presence(
+    state: &AppState,
+    account_id: Uuid,
+    username: &str,
+    online: bool,
+    status: PresenceStatus,
+) {
     // Pobierz listę kontaktów, których trzeba poinformować
     // (czyli wszystkich userów, co mają mnie w kontaktach == owner_id).
     let watchers: Vec<Uuid> = sqlx::query_scalar(
@@ -853,6 +899,7 @@ async fn broadcast_presence(state: &AppState, account_id: Uuid, username: &str, 
     let event = ServerEvent::Presence {
         username: username.to_string(),
         online,
+        status,
     };
     for w in watchers {
         state.hub.send_to(w, event.clone()).await;

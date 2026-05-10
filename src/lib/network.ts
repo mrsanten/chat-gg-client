@@ -30,7 +30,8 @@ export type ClientEvent =
       client_msg_id?: string;
     }
   | { type: "send_welcome"; to: string; ciphertext: string }
-  | { type: "ping" };
+  | { type: "ping" }
+  | { type: "set_status"; status: "online" | "afk" };
 
 export type ServerEvent =
   | { type: "ready"; account_id: string; username: string }
@@ -49,7 +50,14 @@ export type ServerEvent =
       created_at: string;
     }
   | { type: "typing"; from: string; state: TypingState }
-  | { type: "presence"; username: string; online: boolean }
+  | {
+      type: "presence";
+      username: string;
+      online: boolean;
+      /** Pole dodane w v0.13 (AFK). Stary serwer nie wyśle — interpretujemy
+       *  jako online jeśli online=true, offline jeśli online=false. */
+      status?: "online" | "afk" | "offline";
+    }
   | {
       type: "blob";
       id: string;

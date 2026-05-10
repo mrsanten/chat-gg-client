@@ -1,4 +1,4 @@
-import sunIcon from "../assets/sun.svg";
+import appIcon from "../assets/app-icon.png";
 
 interface Props {
   onOpenSettings: () => void;
@@ -43,7 +43,7 @@ export function Toolbar({
   return (
     <div className="gg-toolbar">
       <div className="gg-toolbar-brand" aria-hidden>
-        <img src={sunIcon} alt="" />
+        <img src={appIcon} alt="" />
       </div>
       {TOOLBAR_ITEMS.map((item) => {
         const isNetwork = item.action === "openNetwork";

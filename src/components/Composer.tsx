@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import sunIcon from "../assets/sun.svg";
 import type { ImageAttachment, Macro } from "../types";
 import { applyMacro } from "../lib/macros";
+import { EmotePicker } from "./EmotePicker";
 
 interface Props {
   disabled?: boolean;
@@ -17,6 +18,8 @@ interface Props {
    * to do WebSocket `typing` event.
    */
   onTypingChange?: (typing: boolean) => void;
+  /** Pokaż przycisk emotek (tylko peer chat). */
+  enableEmotes?: boolean;
 }
 
 const MAX_IMAGES = 6;
@@ -30,13 +33,32 @@ export function Composer({
   onSend,
   onStop,
   onTypingChange,
+  enableEmotes,
 }: Props) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<ImageAttachment[]>([]);
+  const [emotePickerOpen, setEmotePickerOpen] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
+  const emoteBtnRef = useRef<HTMLButtonElement>(null);
   const pendingCaretRef = useRef<number | null>(null);
   const typingActiveRef = useRef(false);
   const typingTimerRef = useRef<number | null>(null);
+
+  const insertEmote = (trigger: string) => {
+    const el = ref.current;
+    const insertion = `<${trigger}>`;
+    if (!el) {
+      setText((t) => t + insertion);
+      pendingCaretRef.current = null;
+      return;
+    }
+    const start = el.selectionStart ?? text.length;
+    const end = el.selectionEnd ?? text.length;
+    const next = text.slice(0, start) + insertion + text.slice(end);
+    pendingCaretRef.current = start + insertion.length;
+    setText(next);
+    if (next.length > 0) noteKeystroke();
+  };
 
   const stopTyping = () => {
     if (typingTimerRef.current != null) {
@@ -231,6 +253,19 @@ export function Composer({
               : "Cmd+V żeby wkleić obrazek..."
           }
         />
+        {enableEmotes && !isStreaming && (
+          <button
+            type="button"
+            ref={emoteBtnRef}
+            className={`gg-emote-btn${emotePickerOpen ? " is-open" : ""}`}
+            onClick={() => setEmotePickerOpen((v) => !v)}
+            title="Emotki"
+            aria-label="Emotki"
+            aria-expanded={emotePickerOpen}
+          >
+            <span aria-hidden>:‑)</span>
+          </button>
+        )}
         {isStreaming ? (
           <button
             type="button"
@@ -253,6 +288,14 @@ export function Composer({
           </button>
         )}
       </div>
+      {enableEmotes && (
+        <EmotePicker
+          open={emotePickerOpen}
+          anchor={emoteBtnRef.current}
+          onClose={() => setEmotePickerOpen(false)}
+          onPick={(trigger) => insertEmote(trigger)}
+        />
+      )}
     </div>
   );
 }

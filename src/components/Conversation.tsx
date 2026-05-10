@@ -7,9 +7,22 @@ interface Props {
   model: ToolModel;
   messages: ChatMessage[];
   sessionTitle?: string | null;
+  /** Peer presence — pokazujemy ikonę zamiast słońca w nagłówku czatu z kontaktem. */
+  peerPresence?: "online" | "afk" | "offline" | "connecting" | null;
+  /** Liczba nieprzeczytanych dla aktywnego peera; >0 włącza miganie ikony. */
+  peerUnread?: number;
+  /** True gdy to czat z kontaktem (nie z AI) — włącza render emotek. */
+  peerChat?: boolean;
 }
 
-export function Conversation({ model, messages, sessionTitle }: Props) {
+export function Conversation({
+  model,
+  messages,
+  sessionTitle,
+  peerPresence,
+  peerUnread,
+  peerChat,
+}: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,36 +31,55 @@ export function Conversation({ model, messages, sessionTitle }: Props) {
     el.scrollTop = el.scrollHeight;
   }, [messages]);
 
+  // Dla AI tool zostaje słońce. Dla peera ikona presence (z opcjonalnym
+  // mignięciem unread).
+  const presenceClass = peerPresence
+    ? peerPresence === "online"
+      ? "gg-friend-dot--on"
+      : peerPresence === "afk"
+        ? "gg-friend-dot--afk"
+        : peerPresence === "offline"
+          ? "gg-friend-dot--off"
+          : "gg-friend-dot--connecting"
+    : null;
+  const showUnreadBlink = !!peerPresence && (peerUnread ?? 0) > 0;
+
   return (
     <div className="gg-chatwin">
       <div className="gg-chatwin-titlebar">
-        <img src={sunIcon} alt="" className="gg-chatwin-titlebar-icon" />
+        {peerPresence ? (
+          <span className="gg-chatwin-titlebar-icon gg-friend-dot-wrap" aria-hidden>
+            <span className={`gg-friend-dot ${presenceClass}`} />
+            {showUnreadBlink && (
+              <span className="gg-friend-dot gg-friend-dot--unread gg-friend-dot--blink" />
+            )}
+          </span>
+        ) : (
+          <img src={sunIcon} alt="" className="gg-chatwin-titlebar-icon" />
+        )}
         <span className="gg-chatwin-titlebar-text">
           {model.name}
           {sessionTitle ? <span className="gg-chatwin-subtitle"> — {sessionTitle}</span> : null}
         </span>
-        <div className="gg-chatwin-titlebar-buttons">
-          <button className="gg-chatwin-titlebar-btn" tabIndex={-1}>
-            <span className="gg-glyph gg-glyph--min" />
-          </button>
-          <button className="gg-chatwin-titlebar-btn" tabIndex={-1}>
-            <span className="gg-glyph gg-glyph--max" />
-          </button>
-          <button className="gg-chatwin-titlebar-btn" tabIndex={-1}>
-            <span className="gg-glyph gg-glyph--close" />
-          </button>
-        </div>
       </div>
       <div className="gg-conversation" ref={ref}>
         {messages.map((m) => (
-          <Message key={m.id} msg={m} modelName={model.name} />
+          <Message key={m.id} msg={m} modelName={model.name} emotes={peerChat} />
         ))}
       </div>
     </div>
   );
 }
 
-function Message({ msg, modelName }: { msg: ChatMessage; modelName: string }) {
+function Message({
+  msg,
+  modelName,
+  emotes,
+}: {
+  msg: ChatMessage;
+  modelName: string;
+  emotes?: boolean;
+}) {
   const isUser = msg.role === "user";
   const [copied, setCopied] = useState(false);
 
@@ -82,7 +114,7 @@ function Message({ msg, modelName }: { msg: ChatMessage; modelName: string }) {
             ))}
           </div>
         )}
-        <MessageBody text={msg.text} streaming={msg.streaming} />
+        <MessageBody text={msg.text} streaming={msg.streaming} emotes={emotes} />
         {showCopy && (
           <button
             type="button"

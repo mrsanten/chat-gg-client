@@ -10,6 +10,7 @@ export interface ServerAccount {
   id: string;
   username: string;
   created_at: string;
+  description?: string;
 }
 
 export interface AuthResponse {
@@ -23,6 +24,9 @@ export interface ServerContact {
   nickname: string | null;
   created_at: string;
   online: boolean;
+  /** Granularny status. Brak (stary serwer) → online jeśli `online=true`. */
+  status?: "online" | "afk" | "offline";
+  description?: string;
 }
 
 export interface ServerMessage {
@@ -167,6 +171,18 @@ export async function login(
 
 export async function me(serverUrl: string, token: string): Promise<ServerAccount> {
   return request<ServerAccount>("GET", serverUrl, "/me", { token });
+}
+
+/** PUT /me/profile — aktualizuje opis usera (max 200 znaków). */
+export async function updateProfile(
+  serverUrl: string,
+  token: string,
+  description: string,
+): Promise<ServerAccount> {
+  return request<ServerAccount>("PUT", serverUrl, "/me/profile", {
+    token,
+    body: { description },
+  });
 }
 
 export async function listContacts(
