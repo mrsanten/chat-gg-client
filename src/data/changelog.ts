@@ -12,6 +12,13 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.9.3",
+    date: "2026-05-09",
+    notes: [
+      'Fix: placeholder „[stara wiadomość — klucze rotowane]" pojawiał się dla świeżo wymienionych wiadomości. Powód: mls_decrypt jest stateful (zużywa klucz z secret tree), a klient próbował deszyfrować ten sam ciphertext drugi raz przy ładowaniu historii — pierwszy decrypt zużył klucz, drugi rzucał error. Teraz przed decryptem sprawdzamy cache w peerMessagesByPeer i używamy już zdeszyfrowanego plaintextu.',
+    ],
+  },
+  {
     version: "0.9.2",
     date: "2026-05-09",
     notes: [

@@ -743,12 +743,25 @@ export default function App() {
       const accountId = myId;
       // Server zwraca DESC — odwracamy na ASC do wyświetlania.
       const asc = [...list].reverse();
+      // KRYTYCZNE: mls_decrypt jest stateful — zużywa key z secret tree.
+      // Drugi raz na tym samym ciphertext rzuca error. Jeśli więc dla
+      // jakiegoś id mamy już zdeszyfrowaną wiadomość w pamięci (z live
+      // WS event albo z poprzedniej iteracji), używamy cache zamiast
+      // ponownie wołać mls_decrypt.
+      const existingById = new Map<string, PeerMessage>();
+      const cur = peerMessagesByPeer[peerUsername] ?? [];
+      for (const m of cur) existingById.set(m.id, m);
+
       const decoded: PeerMessage[] = [];
       for (const e of asc) {
+        const cached = existingById.get(e.id);
+        if (cached && !cached.errored) {
+          decoded.push(cached);
+          continue;
+        }
         if (e.kind === "plain") {
           decoded.push(plainEntryToPeer(e, myId));
         } else {
-          // Blob — próbujemy zdeszyfrować lokalnie.
           try {
             const dec = await mlsDecrypt(accountId, e.group_id, e.ciphertext);
             decoded.push({
@@ -774,9 +787,9 @@ export default function App() {
         }
       }
       setPeerMessagesByPeer((prev) => {
-        const cur = prev[peerUsername] ?? [];
+        const curNow = prev[peerUsername] ?? [];
         const seenIds = new Set(decoded.map((m) => m.id));
-        const trailing = cur.filter((m) => m.pending || !seenIds.has(m.id));
+        const trailing = curNow.filter((m) => m.pending || !seenIds.has(m.id));
         return { ...prev, [peerUsername]: [...decoded, ...trailing] };
       });
     } catch (e) {
