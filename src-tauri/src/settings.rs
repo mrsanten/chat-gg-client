@@ -28,6 +28,10 @@ pub struct NetworkSettings {
     pub account_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
+    /// Plain text password — user explicit consent dla auto-login.
+    /// Czyszczone przy wylogowaniu.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
 }
 
 impl Default for NetworkSettings {
@@ -37,6 +41,7 @@ impl Default for NetworkSettings {
             token: String::new(),
             account_id: None,
             username: None,
+            password: None,
         }
     }
 }

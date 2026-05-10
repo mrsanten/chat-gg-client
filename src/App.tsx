@@ -175,15 +175,11 @@ export default function App() {
       // żeby przy następnym otwarciu NetworkAccountDialog user widział
       // formularz logowania zamiast „już zalogowany".
       if (s.network?.token && s.network.server_url) {
-        try {
-          const me = await serverApi.me(s.network.server_url, s.network.token);
-          // Token OK → załaduj listę znajomych. Od v0.10.0 nie potrzebujemy
-          // już MLS identity / KeyPackages dla nowych konwersacji.
-          void refreshContacts(s.network.server_url, s.network.token);
-          // Cache plaintext wiadomości peer-to-peer z poprzedniej sesji.
-          // Patrz komentarz przy peerMessagesSaveTimer w innym useEffect.
+        const tryRestore = async (currentSettings: typeof s, accountId: string) => {
+          // Refresh contacts + załaduj cache plaintext wiadomości.
+          void refreshContacts(currentSettings.network.server_url, currentSettings.network.token);
           try {
-            const raw = localStorage.getItem(`peer-msgs:${me.id}`);
+            const raw = localStorage.getItem(`peer-msgs:${accountId}`);
             if (raw) {
               const parsed = JSON.parse(raw);
               if (parsed && typeof parsed === "object") {
@@ -193,15 +189,64 @@ export default function App() {
           } catch (e) {
             console.warn("[storage] peer-msgs load:", e);
           }
+        };
+
+        try {
+          const me = await serverApi.me(s.network.server_url, s.network.token);
+          await tryRestore(s, me.id);
         } catch (e) {
           if (e instanceof serverApi.ServerError && e.status === 401) {
-            console.warn("[network] zapisany token jest nieważny, czyszczę");
-            const cleared = {
-              ...s,
-              network: { ...s.network, token: "", account_id: null, username: null },
-            };
-            await import("./lib/settings").then((m) => m.saveSettings(cleared));
-            setSettings(cleared);
+            // Token wygasł lub był unieważniony. Spróbuj auto-relogin
+            // jeśli mamy zapisane username + hasło.
+            const username = s.network.username;
+            const password = s.network.password;
+            if (username && password) {
+              try {
+                console.info("[network] auto-relogin via username+password");
+                const auth = await serverApi.login(
+                  s.network.server_url,
+                  username,
+                  password,
+                );
+                const refreshed = {
+                  ...s,
+                  network: {
+                    ...s.network,
+                    token: auth.token,
+                    account_id: auth.account.id,
+                    username: auth.account.username,
+                  },
+                };
+                const settingsLib = await import("./lib/settings");
+                await settingsLib.saveSettings(refreshed);
+                setSettings(refreshed);
+                await tryRestore(refreshed, auth.account.id);
+              } catch (loginErr) {
+                console.warn("[network] auto-relogin failed:", loginErr);
+                const cleared = {
+                  ...s,
+                  network: {
+                    ...s.network,
+                    token: "",
+                    account_id: null,
+                    username: null,
+                    password: null,
+                  },
+                };
+                const settingsLib = await import("./lib/settings");
+                await settingsLib.saveSettings(cleared);
+                setSettings(cleared);
+              }
+            } else {
+              console.warn("[network] zapisany token nieważny, brak hasła do relogu — czyszczę");
+              const cleared = {
+                ...s,
+                network: { ...s.network, token: "", account_id: null, username: null },
+              };
+              const settingsLib = await import("./lib/settings");
+              await settingsLib.saveSettings(cleared);
+              setSettings(cleared);
+            }
           } else {
             // Serwer down albo network error — zostawiamy token, spróbujemy później.
             console.info("[network] /me check skipped:", e);
@@ -1039,6 +1084,15 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenMacros={() => setMacrosOpen(true)}
         onOpenNetwork={() => setNetworkOpen(true)}
+        onAddFriend={() => {
+          // Bez konta sieciowego nie ma jak dodać znajomego — przekieruj
+          // do logowania, AddFriend bez tokena i tak nic nie zrobi.
+          if (settings.network?.token) {
+            setAddFriendOpen(true);
+          } else {
+            setNetworkOpen(true);
+          }
+        }}
         networkOnline={wsStatus.kind === "connected"}
       />
       <div className="gg-body">
@@ -1140,7 +1194,17 @@ export default function App() {
           )}
         </main>
       </div>
-      <Statusbar />
+      <Statusbar
+        net={
+          !settings.network?.token
+            ? "logged_out"
+            : wsStatus.kind === "connected"
+              ? "connected"
+              : wsStatus.kind === "connecting" || wsStatus.kind === "reconnecting"
+                ? "connecting"
+                : "disconnected"
+        }
+      />
       <SettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

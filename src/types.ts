@@ -97,6 +97,13 @@ export interface NetworkSettings {
   /** Cache po loginie — wyświetlanie bez czekania na /me. */
   account_id?: string | null;
   username?: string | null;
+  /**
+   * Hasło zapisane w settings.json (świadomie plain text — user
+   * eksplicytnie poprosił o auto-login). Pozwala odnowić JWT bez
+   * pytania, gdy token wygaśnie albo zostanie unieważniony.
+   * Czyszczone przy wylogowaniu.
+   */
+  password?: string | null;
 }
 
 export interface Settings {

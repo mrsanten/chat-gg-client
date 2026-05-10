@@ -37,7 +37,7 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
 
   const isLoggedIn = settings.network.token.length > 0 && !!settings.network.username;
 
-  const persistAuth = async (resp: serverApi.AuthResponse) => {
+  const persistAuth = async (resp: serverApi.AuthResponse, plainPassword: string) => {
     const next: Settings = {
       ...settings,
       network: {
@@ -46,6 +46,9 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
         token: resp.token,
         account_id: resp.account.id,
         username: resp.account.username,
+        // Zapamiętujemy hasło — pozwala auto-relogin gdy JWT wygaśnie
+        // (default 30 dni). User świadomie poprosił o auto-connect.
+        password: plainPassword,
       },
     };
     await saveSettings(next);
@@ -64,7 +67,7 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
         mode === "login"
           ? await serverApi.login(serverUrl, username.trim(), password)
           : await serverApi.register(serverUrl, username.trim(), password);
-      await persistAuth(resp);
+      await persistAuth(resp, password);
       onClose();
     } catch (e) {
       const msg =
@@ -91,6 +94,7 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
           token: "",
           account_id: null,
           username: null,
+          password: null,
         },
       };
       await saveSettings(next);

@@ -12,11 +12,18 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.10.1",
+    date: "2026-05-10",
+    notes: [
+      "Auto-login: hasło zapisuje się lokalnie razem z tokenem JWT. Gdy token wygaśnie albo serwer go unieważni, klient sam ponownie loguje się username + hasłem zamiast prosić o ręczny login.",
+      "Status w stopce „Połączony z siecią GG" pokazuje teraz realny stan WebSocketa: „Połączony" / „Łączenie…" / „Brak połączenia" / „Niezalogowany". Sygnał (4 paski) zapełnia się odpowiednio.",
+      "Przycisk „Dodaj" w pasku narzędzi otwiera dialog dodawania znajomego (zamiast być no-op). Jeśli nie jesteś zalogowany do sieci, najpierw otwiera się okno logowania.",
+    ],
+  },
+  {
     version: "0.10.0",
     date: "2026-05-10",
     notes: [
-      "Świadomy downgrade: nowe wiadomości peer-to-peer wysyłane są teraz plain text przez TLS (do serwera) zamiast E2E przez MLS. Server widzi treść. To upraszcza działanie (znika problematyka rotacji kluczy, multi-device, undecryptable history) kosztem zaufania serwerowi.",
-      "Stare konwersacje MLS (sprzed v0.10.0) dalej działają w obie strony — klient ma legacy decoder dla przychodzących blob-ów i welcome'ów. Nie wysyłamy już jednak nowych blob-ów ani key packages.",
       "Friend dots w panelu bocznym używają teraz ikon ze sprite-sheet `public/icons.png`. Online = żółte słońce, offline = czerwone słońce.",
     ],
   },
