@@ -12,6 +12,16 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.9.0",
+    date: "2026-05-09",
+    notes: [
+      'Wskaźnik „pisze…" w peer chat: gdy znajomy klepie odpowiedź, pod jego username pojawia się napis. Wysyłka po stronie nadawcy debounce-owana 3s, automatyczny stop przy wysyłce/blur.',
+      "Niebieski znacznik liczby nieprzeczytanych wiadomości obok znajomego w sidebarze, gdy chat z nim nie jest aktywny. Reset przy wybraniu peera.",
+      "Ikona 🔒 obok timestampu wiadomości peer-to-peer, która faktycznie przeszła przez MLS encrypt/decrypt. Wiadomości plain z legacy chats jej nie dostają, więc widać kontrolnie, czy konwersacja jest E2E.",
+      "Główny widok profilu w sidebarze pokazuje teraz username sieciowy (po zalogowaniu na serwer GAIdu), zamiast lokalnego nicka z ProfileDialog.",
+    ],
+  },
+  {
     version: "0.8.1",
     date: "2026-05-09",
     notes: [
