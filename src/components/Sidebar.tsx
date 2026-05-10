@@ -22,6 +22,8 @@ interface Props {
   onSelectPeer?: (username: string) => void;
   onAddFriend?: () => void;
   onRemoveFriend?: (contact: ServerContact) => void;
+  /** Mapa username -> liczba nieprzeczytanych. Reset gdy wybierzesz peera. */
+  unreadByPeer?: Record<string, number>;
 }
 
 export function Sidebar(props: Props) {
@@ -43,6 +45,7 @@ export function Sidebar(props: Props) {
     onSelectPeer,
     onAddFriend,
     onRemoveFriend,
+    unreadByPeer,
   } = props;
 
   const [openTools, setOpenTools] = useState(true);
@@ -128,34 +131,42 @@ export function Sidebar(props: Props) {
           {(!contacts || contacts.length === 0) && (
             <div className="gg-history-empty">Brak znajomych. Kliknij „+ Dodaj" żeby zaprosić kogoś po username.</div>
           )}
-          {contacts?.map((c) => (
-            <div
-              key={c.peer_id}
-              className={`gg-session-item${activePeerUsername === c.username ? " is-active" : ""}`}
-              onClick={() => onSelectPeer?.(c.username)}
-              title={c.online ? "Online" : "Offline"}
-            >
-              <span
-                className={`gg-friend-dot ${c.online ? "gg-friend-dot--on" : "gg-friend-dot--off"}`}
-                aria-hidden
-              />
-              <span className="gg-session-title">
-                {c.nickname && c.nickname.trim().length > 0 ? c.nickname : c.username}
-              </span>
-              <button
-                type="button"
-                className="gg-session-del"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onRemoveFriend?.(c);
-                }}
-                title="Usuń znajomego"
-                aria-label="Usuń"
+          {contacts?.map((c) => {
+            const unread = unreadByPeer?.[c.username] ?? 0;
+            return (
+              <div
+                key={c.peer_id}
+                className={`gg-session-item${activePeerUsername === c.username ? " is-active" : ""}`}
+                onClick={() => onSelectPeer?.(c.username)}
+                title={c.online ? "Online" : "Offline"}
               >
-                <span className="gg-glyph gg-glyph--close" />
-              </button>
-            </div>
-          ))}
+                <span
+                  className={`gg-friend-dot ${c.online ? "gg-friend-dot--on" : "gg-friend-dot--off"}`}
+                  aria-hidden
+                />
+                <span className="gg-session-title">
+                  {c.nickname && c.nickname.trim().length > 0 ? c.nickname : c.username}
+                </span>
+                {unread > 0 && (
+                  <span className="gg-friend-unread" title={`${unread} nieprzeczytane`}>
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="gg-session-del"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveFriend?.(c);
+                  }}
+                  title="Usuń znajomego"
+                  aria-label="Usuń"
+                >
+                  <span className="gg-glyph gg-glyph--close" />
+                </button>
+              </div>
+            );
+          })}
         </Section>
       )}
 

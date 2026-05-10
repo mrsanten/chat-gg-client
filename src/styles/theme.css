@@ -1719,3 +1719,25 @@ input, textarea {
 .gg-friend-dot--off {
   background: #b8b8b8;
 }
+
+/* Sidebar — badge nieprzeczytanych przy peerze */
+.gg-friend-unread {
+  background: var(--xp-blue-deep);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+/* E2E lock indicator obok timestampa wiadomosci */
+.gg-msg-e2e {
+  margin-right: 4px;
+  font-size: 10px;
+  opacity: 0.85;
+}
