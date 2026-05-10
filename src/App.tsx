@@ -185,6 +185,19 @@ export default function App() {
           // Token OK → załaduj listę znajomych + zapewnij MLS identity.
           void refreshContacts(s.network.server_url, s.network.token);
           void ensureMlsReady(s.network.server_url, s.network.token, me.id);
+          // Cache plaintext wiadomości peer-to-peer z poprzedniej sesji.
+          // Patrz komentarz przy peerMessagesSaveTimer w innym useEffect.
+          try {
+            const raw = localStorage.getItem(`peer-msgs:${me.id}`);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed && typeof parsed === "object") {
+                setPeerMessagesByPeer(parsed);
+              }
+            }
+          } catch (e) {
+            console.warn("[storage] peer-msgs load:", e);
+          }
         } catch (e) {
           if (e instanceof serverApi.ServerError && e.status === 401) {
             console.warn("[network] zapisany token jest nieważny, czyszczę");
@@ -254,6 +267,43 @@ export default function App() {
   useEffect(() => {
     networkHandlerRef.current = (event) => handleNetworkEvent(event);
   });
+
+  // Cache zdeszyfrowanych wiadomości w localStorage (per-account).
+  // mls_decrypt jest stateful — drugi raz na tym samym ciphertext rzuca,
+  // a klucze z secret tree są kasowane po użyciu. Więc gdy klient
+  // restartuje się i fetchuje historię z serwera, blob-ów już nie
+  // odczyta. Trzymamy plaintext lokalnie, ładujemy przy boot, zapisujemy
+  // przy każdej zmianie peerMessagesByPeer (debounced).
+  const peerMessagesSaveTimer = useRef<number | null>(null);
+  useEffect(() => {
+    const accountId = settings.network?.account_id;
+    if (!accountId) return;
+    if (peerMessagesSaveTimer.current != null) {
+      window.clearTimeout(peerMessagesSaveTimer.current);
+    }
+    peerMessagesSaveTimer.current = window.setTimeout(() => {
+      try {
+        // Nie zapisujemy pending (tymczasowe tmp-id), żeby po restarcie
+        // nie były zatwierdzane jako prawdziwe wiadomości.
+        const sanitized: Record<string, PeerMessage[]> = {};
+        for (const [peer, list] of Object.entries(peerMessagesByPeer)) {
+          sanitized[peer] = list.filter((m) => !m.pending);
+        }
+        localStorage.setItem(
+          `peer-msgs:${accountId}`,
+          JSON.stringify(sanitized),
+        );
+      } catch (e) {
+        console.warn("[storage] peer-msgs save:", e);
+      }
+    }, 250);
+    return () => {
+      if (peerMessagesSaveTimer.current != null) {
+        window.clearTimeout(peerMessagesSaveTimer.current);
+        peerMessagesSaveTimer.current = null;
+      }
+    };
+  }, [peerMessagesByPeer, settings.network?.account_id]);
 
   // Serializacja przetwarzania per-peer — welcome MUSI się zakończyć
   // przed blob od tego samego peera, inaczej mls_decrypt nie znajdzie

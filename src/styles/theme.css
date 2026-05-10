@@ -371,6 +371,26 @@ input, textarea {
   font-size: 11px;
   color: var(--gg-green);
 }
+.gg-profile-status::before {
+  content: "";
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background-image: url("/icons.png");
+  background-repeat: no-repeat;
+  flex-shrink: 0;
+}
+/* y-offset wskazuje ikonkę w sprite-sheet `public/gg-icons.png`.
+   Wartości można dostosować, jeśli sprite ma inną siatkę. */
+.gg-profile-status--online::before        { background-position: 0 -348px; }
+.gg-profile-status--connecting::before    { background-position: 0 -348px; opacity: 0.6; animation: gg-presence-pulse 1.2s ease-in-out infinite; }
+.gg-profile-status--offline::before       { background-position: 0 -348px; filter: grayscale(1); opacity: 0.6; }
+.gg-profile-status--logged_out::before    { background-position: 0 -348px; filter: grayscale(1); opacity: 0.4; }
+@keyframes gg-presence-pulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.9; }
+}
+
 .gg-profile-status--online        { color: var(--gg-green); }
 .gg-profile-status--connecting    { color: var(--gg-orange); }
 .gg-profile-status--offline       { color: #888; }
