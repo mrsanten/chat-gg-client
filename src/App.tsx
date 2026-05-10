@@ -16,15 +16,10 @@ import { AddFriendDialog } from "./components/AddFriendDialog";
 import * as serverApi from "./lib/serverApi";
 import type { ServerContact, HistoryEntry } from "./lib/serverApi";
 import { NetworkClient, type ConnectionStatus, type ServerEvent as NetEvent } from "./lib/network";
-import {
-  mlsInit,
-  mlsGenerateKeyPackages,
-  mlsListGroups,
-  mlsCreateGroupWithPeer,
-  mlsProcessWelcome,
-  mlsEncrypt,
-  mlsDecrypt,
-} from "./lib/mls";
+// Legacy MLS handlery dla wstecznej kompatybilności — userzy ze starszych
+// wersji wciąż mogą wysyłać blob/welcome, my je rozumiemy ale od v0.10.0
+// sami wysyłamy plain WS message.
+import { mlsProcessWelcome, mlsDecrypt } from "./lib/mls";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MODELS } from "./data/models";
 import { checkConfigured, streamChat, welcomeText, ProviderError } from "./lib/providers";
@@ -182,9 +177,9 @@ export default function App() {
       if (s.network?.token && s.network.server_url) {
         try {
           const me = await serverApi.me(s.network.server_url, s.network.token);
-          // Token OK → załaduj listę znajomych + zapewnij MLS identity.
+          // Token OK → załaduj listę znajomych. Od v0.10.0 nie potrzebujemy
+          // już MLS identity / KeyPackages dla nowych konwersacji.
           void refreshContacts(s.network.server_url, s.network.token);
-          void ensureMlsReady(s.network.server_url, s.network.token, me.id);
           // Cache plaintext wiadomości peer-to-peer z poprzedniej sesji.
           // Patrz komentarz przy peerMessagesSaveTimer w innym useEffect.
           try {
@@ -428,9 +423,6 @@ export default function App() {
       setActivePeerUsername(null);
     } else {
       void refreshContacts(s.network.server_url, s.network.token);
-      if (s.network.account_id) {
-        void ensureMlsReady(s.network.server_url, s.network.token, s.network.account_id);
-      }
     }
   };
 
@@ -449,77 +441,6 @@ export default function App() {
    * `BATCH_KP` świeżych i publikuje. Wczytuje też lokalny rejestr grup
    * do mapowań w pamięci. Idempotentne.
    */
-  const ensureMlsReady = async (
-    serverUrl: string,
-    token: string,
-    accountId: string,
-  ) => {
-    const MIN_KP = 3;
-    const BATCH_KP = 10;
-    try {
-      const identity = await mlsInit(accountId);
-      if (identity.freshly_created) {
-        console.info("[mls] nowa tożsamość MLS dla", accountId);
-      }
-      // Wczytaj wszystkie grupy do mapowań w pamięci.
-      const groups = await mlsListGroups(accountId);
-      peerGroupRef.current.clear();
-      groupPeerRef.current.clear();
-      for (const g of groups) {
-        peerGroupRef.current.set(g.peer_username.toLowerCase(), g.group_id_b64);
-        groupPeerRef.current.set(g.group_id_b64, g.peer_username);
-      }
-      const { unconsumed } = await serverApi.keyPackagesCount(serverUrl, token);
-      if (unconsumed < MIN_KP) {
-        const need = BATCH_KP;
-        const fresh = await mlsGenerateKeyPackages(accountId, need);
-        const resp = await serverApi.publishKeyPackages(serverUrl, token, fresh);
-        console.info(
-          "[mls] uzupełniłem KP: +%d, total na serwerze: %d",
-          resp.stored,
-          resp.total_unconsumed,
-        );
-      }
-    } catch (e) {
-      console.warn("[mls] init/keypackage flow nie udał się:", e);
-    }
-  };
-
-  /**
-   * Zwraca group_id_b64 dla rozmowy z `peerUsername`. Jeśli grupa
-   * jeszcze nie istnieje, próbuje ją założyć: claim KeyPackage peera,
-   * mls_create_group_with_peer, send_welcome przez WS. Po sukcesie zwraca
-   * group_id; przy braku KP/peer-a rzuca z czytelnym komunikatem.
-   */
-  const ensureGroupWithPeer = async (peerUsername: string): Promise<string> => {
-    const accountId = settings.network.account_id;
-    const token = settings.network.token;
-    const serverUrl = settings.network.server_url;
-    if (!accountId || !token) {
-      throw new Error("nie jesteś zalogowany na serwerze GAIdu");
-    }
-    const cached = peerGroupRef.current.get(peerUsername.toLowerCase());
-    if (cached) return cached;
-
-    const claim = await serverApi.claimKeyPackage(serverUrl, token, peerUsername);
-    const created = await mlsCreateGroupWithPeer(
-      accountId,
-      claim.username,
-      claim.data,
-    );
-    peerGroupRef.current.set(claim.username.toLowerCase(), created.group_id_b64);
-    groupPeerRef.current.set(created.group_id_b64, claim.username);
-
-    // Wyślij Welcome do peera. send_welcome jest fire-and-forget;
-    // serwer enqueue'uje gdyby peer był offline.
-    networkRef.current?.send({
-      type: "send_welcome",
-      to: claim.username,
-      ciphertext: created.welcome_b64,
-    });
-    return created.group_id_b64;
-  };
-
   const onAddedFriend = (c: ServerContact) => {
     setContacts((prev) => {
       if (prev.some((x) => x.peer_id === c.peer_id)) return prev;
@@ -896,10 +817,13 @@ export default function App() {
     void ensurePeerHistoryLoaded(username);
   };
 
-  const onPeerSend = async (text: string) => {
+  const onPeerSend = (text: string) => {
+    // v0.10.0: rip out MLS — wysyłamy plain WS event `send`. Server zapisuje
+    // do tabeli `messages` (plain text), peer odbiera przez `message` event.
+    // Stare konwersacje MLS (sprzed v0.10.0) dalej działają dwukierunkowo,
+    // bo legacy blob/welcome handlery zostają.
     const peer = activePeerUsername;
-    const accountId = settings.network.account_id;
-    if (!peer || !networkRef.current || !accountId) return;
+    if (!peer || !networkRef.current) return;
     const trimmed = text.trim();
     if (!trimmed) return;
     const tmpId = "tmp-" + Math.random().toString(36).slice(2, 10);
@@ -910,42 +834,17 @@ export default function App() {
       body: trimmed,
       created_at: new Date().toISOString(),
       pending: true,
-      e2e: true,
     };
     setPeerMessagesByPeer((prev) => {
       const cur = prev[peer] ?? [];
       return { ...prev, [peer]: [...cur, msg] };
     });
-
-    // Phase 3D: szyfrujemy wiadomość przez MLS, wysyłamy jako blob.
-    // Pierwsza wiadomość z peerem inicjuje grupę: claim KP → create →
-    // send_welcome → encrypt → send_blob.
-    try {
-      const groupId = await ensureGroupWithPeer(peer);
-      const enc = await mlsEncrypt(accountId, groupId, trimmed);
-      networkRef.current.send({
-        type: "send_blob",
-        to: peer,
-        group_id: groupId,
-        epoch: enc.epoch,
-        ciphertext: enc.ciphertext_b64,
-        client_msg_id: tmpId,
-      });
-    } catch (e) {
-      console.error("[mls] encrypt+send failed", e);
-      const errMsg = e instanceof Error ? e.message : String(e);
-      setPeerMessagesByPeer((prev) => {
-        const cur = prev[peer] ?? [];
-        return {
-          ...prev,
-          [peer]: cur.map((m) =>
-            m.id === tmpId
-              ? { ...m, pending: false, errored: true, body: m.body + `\n\n[wysyłka E2E padła: ${errMsg}]` }
-              : m,
-          ),
-        };
-      });
-    }
+    networkRef.current.send({
+      type: "send",
+      to: peer,
+      body: trimmed,
+      client_msg_id: tmpId,
+    });
   };
 
   const onQuit = async () => {
@@ -1210,9 +1109,7 @@ export default function App() {
               <Composer
                 disabled={false}
                 isStreaming={false}
-                onSend={(text) => {
-                  void onPeerSend(text);
-                }}
+                onSend={(text) => onPeerSend(text)}
                 onTypingChange={(typing) => {
                   if (!activePeerUsername || !networkRef.current) return;
                   networkRef.current.send({

@@ -1719,24 +1719,22 @@ input, textarea {
   box-shadow: 0 0 4px rgba(46, 184, 46, 0.7);
 }
 
-/* Sidebar Znajomi — kropka presence */
+/* Sidebar Znajomi — kropka presence (sprite z public/icons.png).
+   Zmień background-position dla każdego stanu na faktyczny offset
+   ikony w sprite. Domyślnie:
+     online  = ikona „żółtego słońca" (y=-348, ten sam co profile-status)
+     offline = ikona „czerwonego słońca" — TODO dopasować y. */
 .gg-friend-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 16px;
+  height: 16px;
   margin-right: 6px;
-  border: 1px solid #6a6a6a;
   flex-shrink: 0;
+  background-image: url("/icons.png");
+  background-repeat: no-repeat;
 }
-.gg-friend-dot--on {
-  background: var(--gg-green-light);
-  border-color: var(--gg-green);
-  box-shadow: 0 0 4px rgba(46, 184, 46, 0.7);
-}
-.gg-friend-dot--off {
-  background: #b8b8b8;
-}
+.gg-friend-dot--on  { background-position: 0 -348px; }
+.gg-friend-dot--off { background-position: 0 -348px; filter: hue-rotate(-50deg) saturate(1.5); }
 
 /* Sidebar — badge nieprzeczytanych przy peerze */
 .gg-friend-unread {
