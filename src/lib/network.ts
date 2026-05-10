@@ -88,6 +88,30 @@ export type ConnectionStatus =
 type Listener = (event: ServerEvent) => void;
 type StatusListener = (status: ConnectionStatus) => void;
 
+/**
+ * Snapshot statystyk połączenia. Aktualizowany przy każdym ping/pong RTT,
+ * (re)connect i wysyłce/odbiorze wiadomości.
+ */
+export interface NetworkStats {
+  /** Round-trip time ostatniego ping/pong w ms (null gdy brak danych). */
+  lastPingMs: number | null;
+  /** Ostatnie sample-y RTT (do wykresu). Najstarsze pierwsze. */
+  pingHistoryMs: number[];
+  /** Ile razy przedłużaliśmy reconnect w bieżącej sesji. */
+  reconnectCount: number;
+  /** Ile wiadomości wyszło z klienta od uruchomienia (klient → server). */
+  framesOut: number;
+  /** Ile wiadomości weszło do klienta. */
+  framesIn: number;
+  /** Czas ostatniego successful connect (ms epoch). null gdy nigdy. */
+  lastConnectedAt: number | null;
+  /** Wielkość outboxu w danej chwili. */
+  outboxSize: number;
+}
+
+type StatsListener = (stats: NetworkStats) => void;
+const PING_HISTORY_LEN = 60;
+
 // ─────────────────────────────────── NetworkClient
 
 interface ClientConfig {
@@ -111,6 +135,7 @@ export class NetworkClient {
   private socket: WebSocket | null = null;
   private listeners: Set<Listener> = new Set();
   private statusListeners: Set<StatusListener> = new Set();
+  private statsListeners: Set<StatsListener> = new Set();
   private status: ConnectionStatus = { kind: "idle" };
   /** Bufor wychodzących wiadomości na czas, gdy WS nie jest jeszcze gotowy. */
   private outbox: ClientEvent[] = [];
@@ -118,6 +143,16 @@ export class NetworkClient {
   private reconnectTimer: number | null = null;
   private pingTimer: number | null = null;
   private intentionallyClosed = false;
+  private lastPingSentAt: number | null = null;
+  private stats: NetworkStats = {
+    lastPingMs: null,
+    pingHistoryMs: [],
+    reconnectCount: 0,
+    framesOut: 0,
+    framesIn: 0,
+    lastConnectedAt: null,
+    outboxSize: 0,
+  };
 
   constructor(cfg: ClientConfig) {
     this.cfg = cfg;
@@ -144,16 +179,39 @@ export class NetworkClient {
     return () => this.statusListeners.delete(listener);
   }
 
+  onStats(listener: StatsListener): () => void {
+    this.statsListeners.add(listener);
+    listener(this.stats);
+    return () => this.statsListeners.delete(listener);
+  }
+
   getStatus(): ConnectionStatus {
     return this.status;
+  }
+
+  getStats(): NetworkStats {
+    return this.stats;
   }
 
   /** Wyślij event. Jeśli WS niegotowe, kolejkuj. */
   send(event: ClientEvent): void {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(event));
+      this.bumpStats({ framesOut: this.stats.framesOut + 1 });
     } else {
       this.outbox.push(event);
+      this.bumpStats({ outboxSize: this.outbox.length });
+    }
+  }
+
+  private bumpStats(patch: Partial<NetworkStats>): void {
+    this.stats = { ...this.stats, ...patch };
+    for (const l of this.statsListeners) {
+      try {
+        l(this.stats);
+      } catch (e) {
+        console.error("[network] stats listener threw", e);
+      }
     }
   }
 
@@ -223,8 +281,7 @@ export class NetworkClient {
 
     socket.onopen = () => {
       this.reconnectAttempt = 0;
-      // status zostanie ustawiony na 'connected' dopiero po `Ready` od serwera,
-      // bo dopiero wtedy znamy account_id/username dla pewności.
+      this.bumpStats({ lastConnectedAt: Date.now() });
       this.startPing();
       this.flushOutbox();
     };
@@ -238,6 +295,7 @@ export class NetworkClient {
         return;
       }
       if (!parsed || typeof parsed !== "object") return;
+      this.bumpStats({ framesIn: this.stats.framesIn + 1 });
       this.handleServerEvent(parsed);
     };
 
@@ -269,6 +327,11 @@ export class NetworkClient {
         account_id: event.account_id,
         username: event.username,
       });
+    } else if (event.type === "pong" && this.lastPingSentAt != null) {
+      const rtt = Math.max(0, Date.now() - this.lastPingSentAt);
+      this.lastPingSentAt = null;
+      const next = [...this.stats.pingHistoryMs, rtt].slice(-PING_HISTORY_LEN);
+      this.bumpStats({ lastPingMs: rtt, pingHistoryMs: next });
     }
     // UWAGA: auto-ack zostal ZDJETY. Klient (App.tsx) sam odpala ack po
     // SUKCESIE przetworzenia. Powod: jeli ack idzie przed processem (np.
@@ -290,20 +353,27 @@ export class NetworkClient {
     this.outbox = [];
     for (const ev of queued) {
       this.socket.send(JSON.stringify(ev));
+      this.stats.framesOut += 1;
     }
+    this.bumpStats({ outboxSize: 0, framesOut: this.stats.framesOut });
   }
 
   private startPing(): void {
     this.stopPing();
-    this.pingTimer = window.setInterval(() => {
+    // Pierwszy ping od razu — nie czekamy 30s na pierwszy sample RTT.
+    const fire = () => {
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         try {
+          this.lastPingSentAt = Date.now();
           this.socket.send(JSON.stringify({ type: "ping" }));
+          this.bumpStats({ framesOut: this.stats.framesOut + 1 });
         } catch {
           // ignore
         }
       }
-    }, PING_INTERVAL_MS);
+    };
+    fire();
+    this.pingTimer = window.setInterval(fire, PING_INTERVAL_MS);
   }
 
   private stopPing(): void {
@@ -319,6 +389,7 @@ export class NetworkClient {
     const idx = Math.min(this.reconnectAttempt, RECONNECT_BACKOFF_MS.length - 1);
     const delay = RECONNECT_BACKOFF_MS[idx];
     this.reconnectAttempt += 1;
+    this.bumpStats({ reconnectCount: this.stats.reconnectCount + 1 });
     this.setStatus({
       kind: "reconnecting",
       nextAttemptInMs: delay,

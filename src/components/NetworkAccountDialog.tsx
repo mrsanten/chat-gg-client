@@ -2,18 +2,33 @@ import { useEffect, useState } from "react";
 import sunIcon from "../assets/sun.svg";
 import { PRODUCTION_SERVER_URL, saveSettings } from "../lib/settings";
 import * as serverApi from "../lib/serverApi";
+import type { ConnectionStatus, NetworkStats } from "../lib/network";
 import type { Settings } from "../types";
 
 interface Props {
   open: boolean;
+  /** Tryb wymuszony — bez X w titlebarze, bez Anuluj. Boot apki gdy nie zalogowany. */
+  forced?: boolean;
   settings: Settings;
+  /** Status WS — pokazywany w trybie zalogowanym. */
+  wsStatus?: ConnectionStatus;
+  /** Live statystyki sieci — pokazywane gdy zalogowany. */
+  netStats?: NetworkStats;
   onClose: () => void;
   onSaved: (s: Settings) => void;
 }
 
 type Mode = "login" | "register";
 
-export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props) {
+export function NetworkAccountDialog({
+  open,
+  forced,
+  settings,
+  wsStatus,
+  netStats,
+  onClose,
+  onSaved,
+}: Props) {
   const [mode, setMode] = useState<Mode>("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -21,7 +36,6 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Adres serwera trzymamy centralnie, user nie wybiera. Single instance.
   const serverUrl = PRODUCTION_SERVER_URL;
 
   useEffect(() => {
@@ -46,8 +60,6 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
         token: resp.token,
         account_id: resp.account.id,
         username: resp.account.username,
-        // Zapamiętujemy hasło — pozwala auto-relogin gdy JWT wygaśnie
-        // (default 30 dni). User świadomie poprosił o auto-connect.
         password: plainPassword,
       },
     };
@@ -84,65 +96,44 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
     }
   };
 
-  const logout = async () => {
-    setBusy(true);
-    try {
-      const next: Settings = {
-        ...settings,
-        network: {
-          ...settings.network,
-          token: "",
-          account_id: null,
-          username: null,
-          password: null,
-        },
-      };
-      await saveSettings(next);
-      onSaved(next);
-      onClose();
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <div className="gg-modal-backdrop">
-      <div className="gg-modal">
+      <div className="gg-modal gg-modal--wide">
         <div className="gg-modal-titlebar">
           <img src={sunIcon} alt="" className="gg-chatwin-titlebar-icon" />
-          <span className="gg-chatwin-titlebar-text">Konto sieciowe</span>
-          <div className="gg-chatwin-titlebar-buttons">
-            <button className="gg-chatwin-titlebar-btn" onClick={onClose} aria-label="Zamknij">
-              <span className="gg-glyph gg-glyph--close" />
-            </button>
-          </div>
+          <span className="gg-chatwin-titlebar-text">Sieć</span>
+          {!forced && (
+            <div className="gg-chatwin-titlebar-buttons">
+              <button
+                className="gg-chatwin-titlebar-btn"
+                onClick={onClose}
+                aria-label="Zamknij"
+              >
+                <span className="gg-glyph gg-glyph--close" />
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="gg-modal-body">
           {isLoggedIn ? (
-            <>
-              <fieldset className="gg-fieldset">
-                <legend>Zalogowany</legend>
-                <p>
-                  <strong>{settings.network.username}</strong>
-                </p>
-                <p className="gg-hint">
-                  Serwer: <code>{serverUrl}</code>
-                </p>
-                <p className="gg-hint">
-                  Po wylogowaniu sesja jest tylko czyszczona lokalnie. Token JWT
-                  pozostaje ważny po stronie serwera do końca swojego TTL (30 dni
-                  od wystawienia). Phase 1 nie ma jeszcze rewokacji tokenów.
-                </p>
-              </fieldset>
-            </>
+            <NetworkStatusPanel
+              username={settings.network.username ?? ""}
+              wsStatus={wsStatus}
+              netStats={netStats}
+            />
           ) : (
             <>
+              {forced && (
+                <p className="gg-hint">
+                  Zaloguj się do sieci GAIdu, żeby korzystać z apki. Hasło zostanie
+                  zapamiętane lokalnie — przy następnym uruchomieniu połączymy się
+                  automatycznie.
+                </p>
+              )}
+
               <fieldset className="gg-fieldset">
                 <legend>{mode === "login" ? "Logowanie" : "Rejestracja"}</legend>
-                <p className="gg-hint">
-                  Serwer: <code>{serverUrl}</code>
-                </p>
                 <div className="gg-field">
                   <input
                     type="text"
@@ -215,19 +206,16 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
 
         <div className="gg-modal-actions">
           {isLoggedIn ? (
-            <>
-              <button type="button" className="gg-btn" onClick={onClose} disabled={busy}>
-                Anuluj
-              </button>
-              <button type="button" className="gg-btn" onClick={logout} disabled={busy}>
-                Wyloguj
-              </button>
-            </>
+            <button type="button" className="gg-btn" onClick={onClose}>
+              Zamknij
+            </button>
           ) : (
             <>
-              <button type="button" className="gg-btn" onClick={onClose} disabled={busy}>
-                Anuluj
-              </button>
+              {!forced && (
+                <button type="button" className="gg-btn" onClick={onClose} disabled={busy}>
+                  Anuluj
+                </button>
+              )}
               <button type="button" className="gg-send-btn" onClick={submit} disabled={busy}>
                 <span>{busy ? "..." : mode === "login" ? "Zaloguj" : "Zarejestruj"}</span>
               </button>
@@ -235,6 +223,152 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────── Status panel
+
+interface StatusPanelProps {
+  username: string;
+  wsStatus?: ConnectionStatus;
+  netStats?: NetworkStats;
+}
+
+function NetworkStatusPanel({ username, wsStatus, netStats }: StatusPanelProps) {
+  const status = wsStatus?.kind ?? "idle";
+  const statusText =
+    status === "connected"
+      ? "Połączony"
+      : status === "connecting"
+        ? "Łączenie…"
+        : status === "reconnecting"
+          ? `Ponawiam połączenie (próba ${wsStatus && wsStatus.kind === "reconnecting" ? wsStatus.attempt : "?"})…`
+          : status === "error"
+            ? `Błąd: ${wsStatus && wsStatus.kind === "error" ? wsStatus.message : "?"}`
+            : "Bezczynny";
+  const statusClass =
+    status === "connected"
+      ? "ok"
+      : status === "connecting" || status === "reconnecting"
+        ? "warn"
+        : "down";
+
+  return (
+    <>
+      <fieldset className="gg-fieldset">
+        <legend>Tożsamość</legend>
+        <p>
+          Zalogowany jako <strong>{username}</strong>
+        </p>
+        <p className="gg-hint">
+          Wylogowanie znajdziesz w menu „GAIdu GAIdu" w pasku górnym.
+        </p>
+      </fieldset>
+
+      <fieldset className="gg-fieldset">
+        <legend>Połączenie</legend>
+        <div className="gg-net-status-row">
+          <span className={`gg-net-status-dot gg-net-status-dot--${statusClass}`} aria-hidden />
+          <span className="gg-net-status-label">{statusText}</span>
+        </div>
+        {netStats?.lastConnectedAt && status === "connected" && (
+          <p className="gg-hint">
+            Aktywne od {new Date(netStats.lastConnectedAt).toLocaleTimeString()}
+          </p>
+        )}
+      </fieldset>
+
+      <fieldset className="gg-fieldset">
+        <legend>Statystyki</legend>
+        <div className="gg-net-stats-grid">
+          <Stat label="Ping" value={netStats?.lastPingMs != null ? `${netStats.lastPingMs} ms` : "—"} />
+          <Stat
+            label="Średnia (60 sample)"
+            value={
+              netStats && netStats.pingHistoryMs.length > 0
+                ? `${avg(netStats.pingHistoryMs).toFixed(0)} ms`
+                : "—"
+            }
+          />
+          <Stat label="Frames in" value={netStats?.framesIn ?? 0} />
+          <Stat label="Frames out" value={netStats?.framesOut ?? 0} />
+          <Stat label="Reconnect-y" value={netStats?.reconnectCount ?? 0} />
+          <Stat label="Outbox" value={netStats?.outboxSize ?? 0} />
+        </div>
+        <PingChart history={netStats?.pingHistoryMs ?? []} />
+      </fieldset>
+    </>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="gg-net-stat">
+      <span className="gg-net-stat-label">{label}</span>
+      <span className="gg-net-stat-value">{value}</span>
+    </div>
+  );
+}
+
+function avg(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+interface PingChartProps {
+  history: number[];
+}
+
+/**
+ * Mały SVG line chart pokazujący ostatnie ~60 sample-ów RTT (ms).
+ * Skala Y dynamiczna: max(history, 100) jako ceiling.
+ */
+function PingChart({ history }: PingChartProps) {
+  const w = 360;
+  const h = 60;
+  const padding = 4;
+  const max = Math.max(100, ...history);
+
+  const innerW = w - padding * 2;
+  const innerH = h - padding * 2;
+  const stepX = history.length > 1 ? innerW / (history.length - 1) : 0;
+
+  const path = history
+    .map((rtt, i) => {
+      const x = padding + i * stepX;
+      const y = padding + innerH - (rtt / max) * innerH;
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <div className="gg-ping-chart-wrap">
+      <svg
+        className="gg-ping-chart"
+        width="100%"
+        height={h}
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Wykres ping w czasie"
+      >
+        <rect x="0" y="0" width={w} height={h} fill="#fbf9ee" stroke="var(--xp-face-shadow)" />
+        {history.length >= 2 && (
+          <path d={path} fill="none" stroke="var(--gg-green)" strokeWidth="1.5" />
+        )}
+        <text x={w - padding} y={padding + 9} fontSize="9" textAnchor="end" fill="#666">
+          {Math.round(max)} ms
+        </text>
+        <text x={padding} y={h - padding - 1} fontSize="9" fill="#666">
+          0 ms
+        </text>
+      </svg>
+      <p className="gg-hint">
+        {history.length === 0
+          ? "Czekam na pierwszy ping…"
+          : `Ostatnie ${history.length} pingów (sample co 30 s).`}
+      </p>
     </div>
   );
 }

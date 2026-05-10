@@ -4,6 +4,9 @@ interface Props {
   onOpenSettings: () => void;
   onOpenChangelog: () => void;
   onCheckForUpdates: () => void;
+  /** Tylko widoczne gdy `loggedInUsername` jest niepusty. */
+  onLogout?: () => void;
+  loggedInUsername?: string | null;
   onQuit: () => void;
 }
 
@@ -11,6 +14,8 @@ export function Menubar({
   onOpenSettings,
   onOpenChangelog,
   onCheckForUpdates,
+  onLogout,
+  loggedInUsername,
   onQuit,
 }: Props) {
   const [openMenu, setOpenMenu] = useState<null | "main" | "help">(null);
@@ -63,6 +68,22 @@ export function Menubar({
             >
               Sprawdź aktualizacje
             </button>
+            {loggedInUsername && onLogout && (
+              <>
+                <div className="gg-menu-sep" />
+                <button
+                  type="button"
+                  className="gg-menu-item"
+                  onClick={() => {
+                    setOpenMenu(null);
+                    onLogout();
+                  }}
+                  title={`Zalogowany jako ${loggedInUsername}`}
+                >
+                  Wyloguj ({loggedInUsername})
+                </button>
+              </>
+            )}
             <div className="gg-menu-sep" />
             <button
               type="button"
