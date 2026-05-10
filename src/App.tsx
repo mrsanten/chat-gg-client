@@ -361,29 +361,21 @@ export default function App() {
     activePeerUsernameRef.current = activePeerUsername;
   }, [activePeerUsername]);
 
-  // Periodic history refresh: gdy okno ma focus, co 30s dociągamy historię
-  // aktywnego peera. Plus reaguj na sam event `focus` żeby było reactive
-  // przy wracaniu do aplikacji. Multi-device sync defense-in-depth — gdyby
-  // event `sent` od drugiego device-a zaginął albo WS chwilowo padł, focus
-  // i tak załapie świeże wiadomości. Trzymamy ref na ensurePeerHistoryLoaded
-  // żeby closure setIntervala miał świeży token/account_id.
+  // History refresh przy każdym `focus` na oknie (multi-device defense-in-depth:
+  // wracasz do appki, dociągamy świeże). Bez interwału — `focus` plus
+  // on-peer-select + `ready` (WS reconnect) wystarczają, mniej race conditions.
   const ensureHistoryRef = useRef<(peer: string) => Promise<void>>(async () => {});
   useEffect(() => {
     ensureHistoryRef.current = ensurePeerHistoryLoaded;
   });
   useEffect(() => {
-    const tick = () => {
-      if (!document.hasFocus()) return;
+    const onFocus = () => {
       const peer = activePeerUsernameRef.current;
       if (!peer) return;
       void ensureHistoryRef.current(peer);
     };
-    const interval = window.setInterval(tick, 30_000);
-    window.addEventListener("focus", tick);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", tick);
-    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, []);
 
   // Idle detection: po 1 min bez aktywności (mouse/keyboard/touch/focus)
@@ -996,9 +988,18 @@ export default function App() {
       }
       setPeerMessagesByPeer((prev) => {
         const curNow = prev[peerUsername] ?? [];
-        const seenIds = new Set(decoded.map((m) => m.id));
-        const trailing = curNow.filter((m) => m.pending || !seenIds.has(m.id));
-        return { ...prev, [peerUsername]: [...decoded, ...trailing] };
+        // Additive merge: zaczynamy od pełnego curNow (NIC nie dropujemy),
+        // dorzucamy z decoded tylko te id-ki których jeszcze nie mamy. To
+        // robi sync ale nigdy nie traci wiadomości w race-conditions
+        // (równoległe fetche, setState z innym setterem między fetch a tym
+        // callbackiem). Posortowane po created_at na końcu.
+        const curIds = new Set(curNow.map((m) => m.id));
+        const newcomers = decoded.filter((m) => !curIds.has(m.id));
+        if (newcomers.length === 0) return prev;
+        const merged = [...curNow, ...newcomers].sort((a, b) =>
+          a.created_at.localeCompare(b.created_at),
+        );
+        return { ...prev, [peerUsername]: merged };
       });
     } catch (e) {
       console.warn("[network] history failed:", e);
