@@ -15,7 +15,12 @@ import { NetworkAccountDialog } from "./components/NetworkAccountDialog";
 import { AddFriendDialog } from "./components/AddFriendDialog";
 import * as serverApi from "./lib/serverApi";
 import type { ServerContact, HistoryEntry } from "./lib/serverApi";
-import { NetworkClient, type ConnectionStatus, type ServerEvent as NetEvent } from "./lib/network";
+import {
+  NetworkClient,
+  type ConnectionStatus,
+  type NetworkStats,
+  type ServerEvent as NetEvent,
+} from "./lib/network";
 // Legacy MLS handlery dla wstecznej kompatybilności — userzy ze starszych
 // wersji wciąż mogą wysyłać blob/welcome, my je rozumiemy ale od v0.10.0
 // sami wysyłamy plain WS message.
@@ -106,11 +111,23 @@ export default function App() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileForcedFirstRun, setProfileForcedFirstRun] = useState(false);
   const [networkOpen, setNetworkOpen] = useState(false);
+  /**
+   * Stan boot-a sieci. Ustawiamy w useEffect po sprawdzeniu tokena.
+   * - loading            — w trakcie sprawdzania
+   * - needs_login        — token brak / nieważny, wymagaj logowania
+   * - logged_in          — token OK, jesteśmy w sieci
+   * - server_unreachable — server padł, ale token jest; tryb degradowany
+   *                        (apka działa, ale tylko AI chats, peer disabled)
+   */
+  const [netBootState, setNetBootState] = useState<
+    "loading" | "needs_login" | "logged_in" | "server_unreachable"
+  >("loading");
   const [addFriendOpen, setAddFriendOpen] = useState(false);
   const [contacts, setContacts] = useState<ServerContact[]>([]);
   const [activePeerUsername, setActivePeerUsername] = useState<string | null>(null);
   const [peerMessagesByPeer, setPeerMessagesByPeer] = useState<Record<string, PeerMessage[]>>({});
   const [wsStatus, setWsStatus] = useState<ConnectionStatus>({ kind: "idle" });
+  const [netStats, setNetStats] = useState<NetworkStats | null>(null);
   const [typingByPeer, setTypingByPeer] = useState<Record<string, boolean>>({});
   const typingTimersRef = useRef<Map<string, number>>(new Map());
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
@@ -176,7 +193,6 @@ export default function App() {
       // formularz logowania zamiast „już zalogowany".
       if (s.network?.token && s.network.server_url) {
         const tryRestore = async (currentSettings: typeof s, accountId: string) => {
-          // Refresh contacts + załaduj cache plaintext wiadomości.
           void refreshContacts(currentSettings.network.server_url, currentSettings.network.token);
           try {
             const raw = localStorage.getItem(`peer-msgs:${accountId}`);
@@ -194,20 +210,15 @@ export default function App() {
         try {
           const me = await serverApi.me(s.network.server_url, s.network.token);
           await tryRestore(s, me.id);
+          setNetBootState("logged_in");
         } catch (e) {
           if (e instanceof serverApi.ServerError && e.status === 401) {
-            // Token wygasł lub był unieważniony. Spróbuj auto-relogin
-            // jeśli mamy zapisane username + hasło.
             const username = s.network.username;
             const password = s.network.password;
             if (username && password) {
               try {
                 console.info("[network] auto-relogin via username+password");
-                const auth = await serverApi.login(
-                  s.network.server_url,
-                  username,
-                  password,
-                );
+                const auth = await serverApi.login(s.network.server_url, username, password);
                 const refreshed = {
                   ...s,
                   network: {
@@ -221,24 +232,31 @@ export default function App() {
                 await settingsLib.saveSettings(refreshed);
                 setSettings(refreshed);
                 await tryRestore(refreshed, auth.account.id);
+                setNetBootState("logged_in");
               } catch (loginErr) {
-                console.warn("[network] auto-relogin failed:", loginErr);
-                const cleared = {
-                  ...s,
-                  network: {
-                    ...s.network,
-                    token: "",
-                    account_id: null,
-                    username: null,
-                    password: null,
-                  },
-                };
-                const settingsLib = await import("./lib/settings");
-                await settingsLib.saveSettings(cleared);
-                setSettings(cleared);
+                if (loginErr instanceof serverApi.ServerError && loginErr.status === 401) {
+                  console.warn("[network] auto-relogin: złe credentials, czyszczę");
+                  const cleared = {
+                    ...s,
+                    network: {
+                      ...s.network,
+                      token: "",
+                      account_id: null,
+                      username: null,
+                      password: null,
+                    },
+                  };
+                  const settingsLib = await import("./lib/settings");
+                  await settingsLib.saveSettings(cleared);
+                  setSettings(cleared);
+                  setNetBootState("needs_login");
+                } else {
+                  // Network error przy auto-relogin → server down.
+                  console.info("[network] auto-relogin: server unreachable, tryb degradowany");
+                  setNetBootState("server_unreachable");
+                }
               }
             } else {
-              console.warn("[network] zapisany token nieważny, brak hasła do relogu — czyszczę");
               const cleared = {
                 ...s,
                 network: { ...s.network, token: "", account_id: null, username: null },
@@ -246,12 +264,16 @@ export default function App() {
               const settingsLib = await import("./lib/settings");
               await settingsLib.saveSettings(cleared);
               setSettings(cleared);
+              setNetBootState("needs_login");
             }
           } else {
-            // Serwer down albo network error — zostawiamy token, spróbujemy później.
-            console.info("[network] /me check skipped:", e);
+            // Serwer down — degraded mode.
+            console.info("[network] /me failed (server down?):", e);
+            setNetBootState("server_unreachable");
           }
         }
+      } else {
+        setNetBootState("needs_login");
       }
     })();
     // Sprawdź aktualizacje w tle przy starcie + co 5 minut + przy powrocie
@@ -462,12 +484,13 @@ export default function App() {
 
   const onSettingsSaved = (s: Settings) => {
     setSettings(s);
-    // Po (wy)logowaniu odświeżamy lub czyścimy listę kontaktów.
     if (!s.network.token) {
       setContacts([]);
       setActivePeerUsername(null);
+      setNetBootState("needs_login");
     } else {
       void refreshContacts(s.network.server_url, s.network.token);
+      setNetBootState("logged_in");
     }
   };
 
@@ -547,6 +570,7 @@ export default function App() {
     networkRef.current = client;
 
     const unsubStatus = client.onStatus(setWsStatus);
+    const unsubStats = client.onStats(setNetStats);
     // Wywołujemy zawsze najświeższą wersję handlera (z aktualnym settings).
     const unsub = client.on((event) => networkHandlerRef.current?.(event));
 
@@ -555,6 +579,7 @@ export default function App() {
     return () => {
       unsub();
       unsubStatus();
+      unsubStats();
       client.disconnect();
       networkRef.current = null;
     };
@@ -900,6 +925,35 @@ export default function App() {
     }
   };
 
+  const onLogout = async () => {
+    const cleared: Settings = {
+      ...settings,
+      network: {
+        ...settings.network,
+        token: "",
+        account_id: null,
+        username: null,
+        password: null,
+      },
+    };
+    try {
+      const settingsLib = await import("./lib/settings");
+      await settingsLib.saveSettings(cleared);
+    } catch (e) {
+      console.warn("[logout] save:", e);
+    }
+    setSettings(cleared);
+    setContacts([]);
+    setActivePeerUsername(null);
+    setPeerMessagesByPeer({});
+    setUnreadByPeer({});
+    setTypingByPeer({});
+    historyLoadedFor.current.clear();
+    peerGroupRef.current.clear();
+    groupPeerRef.current.clear();
+    setNetBootState("needs_login");
+  };
+
   const sessionMacroKey = activeSessionId ?? PENDING_SESSION_KEY;
   const activeSessionMacroIds = sessionMacrosBySession[sessionMacroKey] ?? [];
 
@@ -1078,6 +1132,8 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenChangelog={() => setChangelogOpen(true)}
         onCheckForUpdates={onCheckForUpdates}
+        onLogout={settings.network?.token ? onLogout : undefined}
+        loggedInUsername={settings.network?.username ?? null}
         onQuit={onQuit}
       />
       <Toolbar
@@ -1217,11 +1273,20 @@ export default function App() {
       />
       <ChangelogDialog open={changelogOpen} onClose={() => setChangelogOpen(false)} />
       <NetworkAccountDialog
-        open={networkOpen}
+        open={networkOpen || netBootState === "needs_login"}
+        forced={netBootState === "needs_login"}
         settings={settings}
+        wsStatus={wsStatus}
+        netStats={netStats ?? undefined}
         onClose={() => setNetworkOpen(false)}
         onSaved={onSettingsSaved}
       />
+      {netBootState === "server_unreachable" && (
+        <div className="gg-net-offline-banner" role="status">
+          Sieć GAIdu chwilowo niedostępna. Możesz korzystać z chatów AI;
+          rozmowy ze znajomymi wrócą gdy serwer się odezwie.
+        </div>
+      )}
       <AddFriendDialog
         open={addFriendOpen}
         serverUrl={settings.network.server_url}

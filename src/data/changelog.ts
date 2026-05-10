@@ -12,12 +12,22 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.11.0",
+    date: "2026-05-10",
+    notes: [
+      "Wymuszony login do sieci GAIdu. Apka odpala się od razu z dialogiem logowania, jeśli nie ma ważnego tokena. Hasło zapamiętane przy poprzedniej sesji jest używane do auto-loginu.",
+      "Tryb degradowany: gdy serwer GAIdu jest niedostępny (network error), apka się otwiera i pozwala korzystać z chatów AI. Sekcja znajomych wyłączona. Banner informuje, że sieć wróci jak serwer się odezwie.",
+      'Wyloguj przeniesione z dialogu Sieć do dropdownu „GAIdu GAIdu" w pasku menu. Pokazuje też username pod którym jesteś zalogowany.',
+      "Dialog Sieć przebudowany: zamiast formularza logowania (gdy zalogowany) pokazuje status WS, czas aktywności, ping ostatni, średni ping z ostatnich 60 sample-ów, frames in/out, liczbę reconnect-ów, wielkość outboxu i mały wykres ping w czasie.",
+    ],
+  },
+  {
     version: "0.10.1",
     date: "2026-05-10",
     notes: [
       "Auto-login: hasło zapisuje się lokalnie razem z tokenem JWT. Gdy token wygaśnie albo serwer go unieważni, klient sam ponownie loguje się username + hasłem zamiast prosić o ręczny login.",
-      "Status w stopce „Połączony z siecią GG" pokazuje teraz realny stan WebSocketa: „Połączony" / „Łączenie…" / „Brak połączenia" / „Niezalogowany". Sygnał (4 paski) zapełnia się odpowiednio.",
-      "Przycisk „Dodaj" w pasku narzędzi otwiera dialog dodawania znajomego (zamiast być no-op). Jeśli nie jesteś zalogowany do sieci, najpierw otwiera się okno logowania.",
+      'Status w stopce „Połączony z siecią GG" pokazuje teraz realny stan WebSocketa: „Połączony" / „Łączenie…" / „Brak połączenia" / „Niezalogowany". Sygnał (4 paski) zapełnia się odpowiednio.',
+      'Przycisk „Dodaj" w pasku narzędzi otwiera dialog dodawania znajomego (zamiast być no-op). Jeśli nie jesteś zalogowany do sieci, najpierw otwiera się okno logowania.',
     ],
   },
   {

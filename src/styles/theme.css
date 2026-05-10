@@ -1764,3 +1764,70 @@ input, textarea {
   font-size: 10px;
   opacity: 0.85;
 }
+
+/* === NetworkAccountDialog status panel === */
+.gg-net-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gg-net-status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid #6a6a6a;
+  background: #b8b8b8;
+}
+.gg-net-status-dot--ok   { background: var(--gg-green-light); border-color: var(--gg-green); box-shadow: 0 0 6px rgba(46,184,46,0.7); }
+.gg-net-status-dot--warn { background: var(--gg-orange-2); border-color: var(--gg-orange); animation: gg-pulse 1.2s ease-in-out infinite; }
+.gg-net-status-dot--down { background: #c8c8c8; }
+@keyframes gg-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+.gg-net-status-label {
+  font-size: 12px;
+}
+.gg-net-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  margin-bottom: 6px;
+}
+.gg-net-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 6px;
+  background: #fbf9ee;
+  border: 1px solid var(--xp-face-shadow);
+  font-size: 11px;
+}
+.gg-net-stat-label  { color: #555; }
+.gg-net-stat-value  { font-family: var(--font-mono); font-weight: 700; }
+.gg-ping-chart-wrap {
+  margin-top: 6px;
+}
+.gg-ping-chart {
+  display: block;
+  width: 100%;
+  height: 60px;
+}
+
+/* === Offline banner (server unreachable) === */
+.gg-net-offline-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  background: linear-gradient(180deg, #fff5d0 0%, #ffd980 100%);
+  border: 1px solid #b88a1a;
+  font-size: 11px;
+  color: #5a3f00;
+  z-index: 999;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  max-width: 80%;
+  text-align: center;
+}
