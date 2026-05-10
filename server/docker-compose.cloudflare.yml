@@ -1,0 +1,28 @@
+# Overlay dla setupu, w którym TLS robi Cloudflare (Tunnel albo zwykły
+# Cloudflare proxy), a lokalnie reverse proxy robi istniejący Caddy
+# nasłuchujący na :80 wewnątrz Dockera.
+#
+# Usage (na VPS-ie):
+#   echo "CADDY_NETWORK=<nazwa_sieci_caddy>" >> .env
+#   docker compose -f docker-compose.yml \
+#                  -f docker-compose.prod.yml \
+#                  -f docker-compose.cloudflare.yml up -d
+#
+# Sprawdź nazwę sieci Caddy:
+#   docker inspect $(docker ps -qf name=caddy) \
+#     --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}'
+
+services:
+  app:
+    container_name: gaidu-server
+    # Wycinamy publikację portu na hosta — ruch idzie tylko przez sieć
+    # Dockera od Caddy do nas.
+    ports: !reset []
+    networks:
+      - default
+      - caddy_external
+
+networks:
+  caddy_external:
+    external: true
+    name: ${CADDY_NETWORK:?CADDY_NETWORK missing — wpisz w .env nazwę sieci, w której siedzi Caddy}
