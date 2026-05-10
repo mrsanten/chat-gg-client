@@ -370,13 +370,11 @@ input, textarea {
   gap: 4px;
   font-size: 11px;
   color: var(--gg-green);
-  cursor: pointer;
 }
-.gg-profile-status::after {
-  content: "▼";
-  font-size: 8px;
-  color: var(--text-mute);
-}
+.gg-profile-status--online        { color: var(--gg-green); }
+.gg-profile-status--connecting    { color: var(--gg-orange); }
+.gg-profile-status--offline       { color: #888; }
+.gg-profile-status--logged_out    { color: var(--text-mute); }
 .gg-profile-desc {
   border: 1px solid #888272;
   background: #ffffff;

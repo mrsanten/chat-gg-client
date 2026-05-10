@@ -270,15 +270,11 @@ export class NetworkClient {
         username: event.username,
       });
     }
-    // Auto-ack dostarczonych wiadomości — serwer i tak robi optimistic
-    // delivered, ale to potwierdza klient zobaczył.
-    if (event.type === "message") {
-      this.send({ type: "ack_delivery", message_id: event.id });
-    } else if (event.type === "blob") {
-      this.send({ type: "ack_blob", blob_id: event.id });
-    } else if (event.type === "welcome") {
-      this.send({ type: "ack_welcome", welcome_id: event.id });
-    }
+    // UWAGA: auto-ack zostal ZDJETY. Klient (App.tsx) sam odpala ack po
+    // SUKCESIE przetworzenia. Powod: jeli ack idzie przed processem (np.
+    // welcome zostal acked, ale mls_process_welcome padl), server marks
+    // delivered=true i juz nie repleyuje. Bez welcome na storage nigdy
+    // nie zdeszyfrujemy zadnego blob-a (bedzie 'grupa nie istnieje').
     for (const l of this.listeners) {
       try {
         l(event);

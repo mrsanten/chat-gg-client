@@ -483,6 +483,26 @@ export default function App() {
       await serverApi.removeContact(settings.network.server_url, settings.network.token, c.peer_id);
       setContacts((prev) => prev.filter((x) => x.peer_id !== c.peer_id));
       if (activePeerUsername === c.username) setActivePeerUsername(null);
+      // Wyczyść cache MLS po stronie klienta. Jeśli user ponownie doda
+      // tego znajomego, ensureGroupWithPeer nie zobaczy stałego
+      // peerGroupRef i wyśle nowy Welcome → przywrócenie konwersacji.
+      const usernameLower = c.username.toLowerCase();
+      const oldGroupId = peerGroupRef.current.get(usernameLower);
+      peerGroupRef.current.delete(usernameLower);
+      if (oldGroupId) groupPeerRef.current.delete(oldGroupId);
+      setPeerMessagesByPeer((prev) => {
+        if (!(c.username in prev)) return prev;
+        const next = { ...prev };
+        delete next[c.username];
+        return next;
+      });
+      historyLoadedFor.current.delete(c.username);
+      setUnreadByPeer((prev) => {
+        if (!(c.username in prev)) return prev;
+        const next = { ...prev };
+        delete next[c.username];
+        return next;
+      });
     } catch (e) {
       console.warn("[network] removeContact failed:", e);
     }
@@ -593,7 +613,6 @@ export default function App() {
         };
         setPeerMessagesByPeer((prev) => {
           const cur = prev[peer] ?? [];
-          // Idempotent: jeśli już mamy to id (z history), nie duplikuj.
           if (cur.some((m) => m.id === msg.id)) return prev;
           return { ...prev, [peer]: [...cur, msg] };
         });
@@ -601,6 +620,8 @@ export default function App() {
           setUnreadByPeer((prev) => ({ ...prev, [peer]: (prev[peer] ?? 0) + 1 }));
         }
         playNotify();
+        // Ack dopiero po dodaniu do state (idempotentne via id check).
+        networkRef.current?.send({ type: "ack_delivery", message_id: event.id });
         break;
       }
       case "sent": {
@@ -654,11 +675,16 @@ export default function App() {
         }
         const sender = event.from;
         const ciphertext = event.ciphertext;
+        const welcomeId = event.id;
         enqueueForPeer(sender, async () => {
           const resp = await mlsProcessWelcome(accountId, sender, ciphertext);
           peerGroupRef.current.set(sender.toLowerCase(), resp.group_id_b64);
           groupPeerRef.current.set(resp.group_id_b64, sender);
           console.info("[mls] joined grupa od", sender, "gid=", resp.group_id_b64);
+          // Ack DOPIERO po sukcesie. Jeśli mls_process_welcome rzuci, ack
+          // nie idzie, server zostawi welcome w queue → spróbuje znowu
+          // przy następnym reconnect.
+          networkRef.current?.send({ type: "ack_welcome", welcome_id: welcomeId });
         });
         break;
       }
@@ -698,14 +724,19 @@ export default function App() {
               setUnreadByPeer((prev) => ({ ...prev, [peer]: (prev[peer] ?? 0) + 1 }));
             }
             playNotify();
+            // Ack po sukcesie. Failed decrypt zostawia w queue do retry.
+            networkRef.current?.send({ type: "ack_blob", blob_id: eventId });
           } catch (e) {
             console.error("[mls] decrypt failed:", e);
             const peer = fallbackPeer;
             const errMsg = e instanceof Error ? e.message : String(e);
+            const friendly = errMsg.includes("grupa nie istnieje")
+              ? "[E2E rozjechany — usuń tego znajomego i dodaj ponownie, żeby przywrócić rozmowę]"
+              : `[E2E błąd: ${errMsg}]`;
             const msg: PeerMessage = {
               id: eventId,
               from_me: false,
-              body: `[E2E błąd deszyfrowania: ${errMsg}]`,
+              body: friendly,
               created_at: createdAt,
               pending: false,
               errored: true,
@@ -715,6 +746,10 @@ export default function App() {
               if (cur.some((m) => m.id === msg.id)) return prev;
               return { ...prev, [peer]: [...cur, msg] };
             });
+            // Też ack — bez tego server będzie walił tym samym blob-em
+            // przy każdym reconnect, a my i tak go nie zdeszyfrujemy.
+            // User dostał czytelny komunikat, więc OK.
+            networkRef.current?.send({ type: "ack_blob", blob_id: eventId });
           }
         });
         break;
@@ -1076,6 +1111,15 @@ export default function App() {
             settings.network?.username ||
             settings.profile?.nick ||
             undefined
+          }
+          presence={
+            !settings.network?.token
+              ? "logged_out"
+              : wsStatus.kind === "connected"
+                ? "online"
+                : wsStatus.kind === "connecting" || wsStatus.kind === "reconnecting"
+                  ? "connecting"
+                  : "offline"
           }
           onEditProfile={() => {
             setProfileForcedFirstRun(false);

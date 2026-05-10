@@ -15,6 +15,11 @@ interface Props {
   onDeleteSession: (id: string) => void;
   nick?: string;
   onEditProfile?: () => void;
+  /**
+   * Status presencji do wyświetlenia pod nickiem. Komponuje się z stanem
+   * sieciowym (zalogowany/łączenie/online).
+   */
+  presence?: "online" | "connecting" | "offline" | "logged_out";
   // Phase 2B.2: lista znajomych. Pokazujemy tylko gdy networkLoggedIn.
   networkLoggedIn?: boolean;
   contacts?: ServerContact[];
@@ -39,6 +44,7 @@ export function Sidebar(props: Props) {
     onDeleteSession,
     nick,
     onEditProfile,
+    presence,
     networkLoggedIn,
     contacts,
     activePeerUsername,
@@ -74,7 +80,15 @@ export function Sidebar(props: Props) {
           >
             {nick && nick.trim().length > 0 ? nick : "Użytkownik"}
           </div>
-          <div className="gg-profile-status">Dostępny</div>
+          <div className={`gg-profile-status gg-profile-status--${presence ?? "logged_out"}`}>
+            {presence === "online"
+              ? "Dostępny"
+              : presence === "connecting"
+                ? "Łączenie…"
+                : presence === "offline"
+                  ? "Brak połączenia"
+                  : "Niezalogowany"}
+          </div>
           <input
             className="gg-profile-desc"
             placeholder="Wpisz opis..."
