@@ -94,7 +94,18 @@ function Message({ msg, modelName }: { msg: ChatMessage; modelName: string }) {
           </button>
         )}
       </div>
-      <span className="gg-msg-time">{msg.timestamp}</span>
+      <span className="gg-msg-time">
+        {msg.e2e && (
+          <span
+            className="gg-msg-e2e"
+            title="Zaszyfrowane end-to-end (MLS)"
+            aria-label="Zaszyfrowane E2E"
+          >
+            🔒
+          </span>
+        )}
+        {msg.timestamp}
+      </span>
     </div>
   );
 }

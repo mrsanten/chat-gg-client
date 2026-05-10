@@ -21,6 +21,8 @@ export interface ChatMessage {
   streaming?: boolean;
   errored?: boolean;
   images?: ImageAttachment[];
+  /** True dla wiadomości peer chat zaszyfrowanej przez MLS. */
+  e2e?: boolean;
 }
 
 export interface ChatSession {
