@@ -12,6 +12,14 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.9.2",
+    date: "2026-05-09",
+    notes: [
+      "Krytyczny bugfix: WS event listener trzymał stale closure z pierwszego renderu, gdzie account_id był null. Welcome i blob handlers bail-outowały zanim coś zrobiły, więc wiadomości E2E nigdy nie dochodziły do odbiorcy. Teraz wywołanie idzie przez ref do najświeższego handlera.",
+      "Welcome i blob od tego samego peera są teraz przetwarzane szeregowo (per-peer Promise chain) — wcześniej był race, blob mógł próbować deszyfrować zanim mls_process_welcome ustawił group state, co rzucało error.",
+    ],
+  },
+  {
     version: "0.9.1",
     date: "2026-05-09",
     notes: [

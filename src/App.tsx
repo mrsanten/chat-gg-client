@@ -245,6 +245,28 @@ export default function App() {
     activePeerUsernameRef.current = activePeerUsername;
   }, [activePeerUsername]);
 
+  // KLUCZOWE: WS listener jest rejestrowany RAZ przy mount, więc closure
+  // capture'uje pierwszy render — settings.network.account_id = null
+  // (bo user jeszcze nie zalogowany). Przez to welcome/blob handler bail
+  // out z 'if (!accountId) break'. Trzymamy najświeższy handler w refie
+  // i wywołujemy przez niego, żeby każde wywołanie miało fresh closure.
+  const networkHandlerRef = useRef<((event: NetEvent) => void) | null>(null);
+  useEffect(() => {
+    networkHandlerRef.current = (event) => handleNetworkEvent(event);
+  });
+
+  // Serializacja przetwarzania per-peer — welcome MUSI się zakończyć
+  // przed blob od tego samego peera, inaczej mls_decrypt nie znajdzie
+  // group state.
+  const peerQueueRef = useRef<Map<string, Promise<void>>>(new Map());
+  const enqueueForPeer = (peer: string, fn: () => Promise<void>) => {
+    const prev = peerQueueRef.current.get(peer) ?? Promise.resolve();
+    const next = prev.then(fn).catch((e) => {
+      console.warn("[mls queue]", peer, e);
+    });
+    peerQueueRef.current.set(peer, next);
+  };
+
   const onInstallUpdate = async () => {
     if (!pendingUpdate) return;
     await installUpdate(pendingUpdate, setUpdateStatus);
@@ -489,7 +511,8 @@ export default function App() {
     networkRef.current = client;
 
     const unsubStatus = client.onStatus(setWsStatus);
-    const unsub = client.on((event) => handleNetworkEvent(event));
+    // Wywołujemy zawsze najświeższą wersję handlera (z aktualnym settings).
+    const unsub = client.on((event) => networkHandlerRef.current?.(event));
 
     if (settings.network.token) client.connect();
 
@@ -621,43 +644,48 @@ export default function App() {
         break;
       }
       case "welcome": {
-        // Phase 3D: peer założył z nami grupę MLS. Przetwarzamy Welcome,
-        // wpisujemy do mappingów. Po tym kolejne 'blob' od tego peera
-        // będą deszyfrowalne.
+        // Phase 3D: peer założył z nami grupę MLS. Welcome musi się
+        // przetworzyć PRZED jakimkolwiek blob-em od tego samego peera,
+        // dlatego enqueue na per-peer chain.
         const accountId = settings.network.account_id;
-        if (!accountId) break;
-        void (async () => {
-          try {
-            const resp = await mlsProcessWelcome(accountId, event.from, event.ciphertext);
-            peerGroupRef.current.set(event.from.toLowerCase(), resp.group_id_b64);
-            groupPeerRef.current.set(resp.group_id_b64, event.from);
-            console.info("[mls] joinedgrupa od", event.from, "gid=", resp.group_id_b64);
-          } catch (e) {
-            console.error("[mls] process_welcome failed:", e);
-          }
-        })();
+        if (!accountId) {
+          console.warn("[mls] welcome bez account_id — pomijam");
+          break;
+        }
+        const sender = event.from;
+        const ciphertext = event.ciphertext;
+        enqueueForPeer(sender, async () => {
+          const resp = await mlsProcessWelcome(accountId, sender, ciphertext);
+          peerGroupRef.current.set(sender.toLowerCase(), resp.group_id_b64);
+          groupPeerRef.current.set(resp.group_id_b64, sender);
+          console.info("[mls] joined grupa od", sender, "gid=", resp.group_id_b64);
+        });
         break;
       }
       case "blob": {
-        // Phase 3D: zaszyfrowana wiadomość MLS od peera. Deszyfruj i
-        // dodaj do peerMessagesByPeer pod kluczem peer username
-        // (z 'event.from' lub naszego mappingu group_id → peer).
+        // Phase 3D: zaszyfrowana wiadomość MLS od peera. Enqueue na ten
+        // sam chain co welcome (event.from), serializacja zapewnia że
+        // welcome się skończył.
         const accountId = settings.network.account_id;
-        if (!accountId) break;
-        const fallbackPeer = groupPeerRef.current.get(event.group_id) ?? event.from;
-        void (async () => {
+        if (!accountId) {
+          console.warn("[mls] blob bez account_id — pomijam");
+          break;
+        }
+        const sender = event.from;
+        const groupId = event.group_id;
+        const ciphertext = event.ciphertext;
+        const eventId = event.id;
+        const createdAt = event.created_at;
+        const fallbackPeer = groupPeerRef.current.get(groupId) ?? sender;
+        enqueueForPeer(sender, async () => {
           try {
-            const resp = await mlsDecrypt(
-              accountId,
-              event.group_id,
-              event.ciphertext,
-            );
+            const resp = await mlsDecrypt(accountId, groupId, ciphertext);
             const peer = resp.sender_username ?? fallbackPeer;
             const msg: PeerMessage = {
-              id: event.id,
+              id: eventId,
               from_me: false,
               body: resp.plaintext,
-              created_at: event.created_at,
+              created_at: createdAt,
               pending: false,
               e2e: true,
             };
@@ -672,16 +700,13 @@ export default function App() {
             playNotify();
           } catch (e) {
             console.error("[mls] decrypt failed:", e);
-            // Fallback: pokazujemy placeholder, żeby user wiedział, że
-            // coś przyszło, ale nie udało się zdeszyfrować (np. brak
-            // welcome jeszcze, desync epoki).
             const peer = fallbackPeer;
             const errMsg = e instanceof Error ? e.message : String(e);
             const msg: PeerMessage = {
-              id: event.id,
+              id: eventId,
               from_me: false,
               body: `[E2E błąd deszyfrowania: ${errMsg}]`,
-              created_at: event.created_at,
+              created_at: createdAt,
               pending: false,
               errored: true,
             };
@@ -691,7 +716,7 @@ export default function App() {
               return { ...prev, [peer]: [...cur, msg] };
             });
           }
-        })();
+        });
         break;
       }
       case "error": {
