@@ -49,6 +49,21 @@ function trimUrl(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
+/**
+ * Normalizuje URL serwera: dorzuca `https://` jeśli brakuje schemy,
+ * usuwa trailing slash. Bez schemy fetch traktuje stringa jako relatywny
+ * path do tauri://localhost/, co kończy się dziwnym 200 z pustym body
+ * i mylącym JS error w UI.
+ */
+export function normalizeServerUrl(input: string): string {
+  let url = (input ?? "").trim();
+  if (!url) return url;
+  if (!/^https?:\/\//i.test(url)) {
+    url = "https://" + url;
+  }
+  return trimUrl(url);
+}
+
 async function request<T>(
   method: string,
   serverUrl: string,
@@ -59,9 +74,10 @@ async function request<T>(
   if (options.body !== undefined) headers["content-type"] = "application/json";
   if (options.token) headers["authorization"] = `Bearer ${options.token}`;
 
+  const fullUrl = `${normalizeServerUrl(serverUrl)}${path}`;
   let resp: Response;
   try {
-    resp = await fetch(`${trimUrl(serverUrl)}${path}`, {
+    resp = await fetch(fullUrl, {
       method,
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -91,6 +107,17 @@ async function request<T>(
         ? (payload as { message: string }).message
         : null) ?? resp.statusText ?? `HTTP ${resp.status}`;
     throw new ServerError(resp.status, code, message);
+  }
+
+  // 200 OK + brak/zły JSON to nie powinna sytuacja dla naszego API. Zamiast
+  // przepuszczać `null` dalej (i crashować w callerze przy `.token`),
+  // zgłaszamy czytelny błąd.
+  if (payload == null && resp.status !== 204) {
+    throw new ServerError(
+      resp.status,
+      "empty_body",
+      `Serwer zwrócił pusty response (HTTP ${resp.status}). Sprawdź czy URL ma poprawną schemę (https://) i czy proxy nie buforuje błędu.`,
+    );
   }
 
   return payload as T;

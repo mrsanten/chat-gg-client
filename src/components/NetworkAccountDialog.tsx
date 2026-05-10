@@ -40,16 +40,18 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
 
   const probeServer = async () => {
     setServerProbe("unknown");
-    const ok = await serverApi.healthz(serverUrl);
+    const normalized = serverApi.normalizeServerUrl(serverUrl);
+    setServerUrl(normalized);
+    const ok = await serverApi.healthz(normalized);
     setServerProbe(ok ? "ok" : "down");
   };
 
-  const persistAuth = async (resp: serverApi.AuthResponse) => {
+  const persistAuth = async (resp: serverApi.AuthResponse, normalizedUrl: string) => {
     const next: Settings = {
       ...settings,
       network: {
         ...settings.network,
-        server_url: serverUrl,
+        server_url: normalizedUrl,
         token: resp.token,
         account_id: resp.account.id,
         username: resp.account.username,
@@ -65,13 +67,15 @@ export function NetworkAccountDialog({ open, settings, onClose, onSaved }: Props
       setErr("Username i hasło są wymagane.");
       return;
     }
+    const normalized = serverApi.normalizeServerUrl(serverUrl);
+    setServerUrl(normalized);
     setBusy(true);
     try {
       const resp =
         mode === "login"
-          ? await serverApi.login(serverUrl, username.trim(), password)
-          : await serverApi.register(serverUrl, username.trim(), password);
-      await persistAuth(resp);
+          ? await serverApi.login(normalized, username.trim(), password)
+          : await serverApi.register(normalized, username.trim(), password);
+      await persistAuth(resp, normalized);
       onClose();
     } catch (e) {
       const msg =
