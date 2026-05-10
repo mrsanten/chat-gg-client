@@ -4,14 +4,19 @@
 FROM rust:1-bookworm AS builder
 WORKDIR /app
 
-# Cache deps: skopiuj manifest, builduj pusty src, potem dorzuc reszte
+# Cache deps: skopiuj manifest, builduj pusty src, potem dorzuc reszte.
+# Po COPY . . MUSIMY usunąć dummy binarkę i `touch` na main.rs, inaczej
+# cargo zobaczy świeży binary i nie zrobi rebuildu — finalny obraz dostanie
+# pustą binarkę (`fn main() {}`).
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir -p src && echo "fn main() {}" > src/main.rs && \
     cargo build --release && \
-    rm -rf src
+    rm -rf src target/release/gaidu-server target/release/deps/gaidu_server*
 
 COPY . .
-RUN cargo build --release
+RUN touch src/main.rs && cargo build --release && \
+    test -s target/release/gaidu-server && \
+    file target/release/gaidu-server
 
 # ──────────────────────────────────────────────────────────────────────
 FROM debian:bookworm-slim AS runtime
