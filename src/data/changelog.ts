@@ -12,6 +12,15 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.13.3",
+    date: "2026-05-11",
+    notes: [
+      "Fix: wiadomości znikały na desktop po chwili. Stary merge w `ensurePeerHistoryLoaded` nadpisywał `curNow` przez decoded z servera, w race condition (równoległe fetche / setState między fetch a callbackiem) gubił treść świeżo wysłanych/odebranych wiadomości. Nowy merge jest czysto additive: zaczyna od pełnego `curNow`, dorzuca tylko brakujące id-ki z decoded, sortuje po `created_at`. Nigdy nic nie drop-uje.",
+      "Usunięty 30 s polling history-fetch, focus event listener i refresh w `case 'ready'`. Zostaje tylko on-peer-select. Mniej concurrent fetch-y, mniej race conditions. Multi-device sync nadal działa przez Sent.body (live WS event).",
+      'Diagnostyka: useEffect monitoruje liczbę wiadomości per peer i loguje `[diag]` warning + stack trace gdy spadnie. Pozwala wyłapać moment „znikania" w DevTools jeśli się powtórzy.',
+    ],
+  },
+  {
     version: "0.13.2",
     date: "2026-05-11",
     notes: [

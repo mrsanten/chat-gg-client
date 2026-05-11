@@ -361,22 +361,25 @@ export default function App() {
     activePeerUsernameRef.current = activePeerUsername;
   }, [activePeerUsername]);
 
-  // History refresh przy każdym `focus` na oknie (multi-device defense-in-depth:
-  // wracasz do appki, dociągamy świeże). Bez interwału — `focus` plus
-  // on-peer-select + `ready` (WS reconnect) wystarczają, mniej race conditions.
-  const ensureHistoryRef = useRef<(peer: string) => Promise<void>>(async () => {});
+  // Diagnostyka: zaloguj każde zmniejszenie liczby wiadomości na peerze.
+  // Pozwala złapać moment „znikania" w DevTools console.
+  const prevPeerCountsRef = useRef<Record<string, number>>({});
   useEffect(() => {
-    ensureHistoryRef.current = ensurePeerHistoryLoaded;
-  });
-  useEffect(() => {
-    const onFocus = () => {
-      const peer = activePeerUsernameRef.current;
-      if (!peer) return;
-      void ensureHistoryRef.current(peer);
-    };
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, []);
+    const counts: Record<string, number> = {};
+    for (const [peer, list] of Object.entries(peerMessagesByPeer)) {
+      counts[peer] = list.length;
+    }
+    for (const [peer, count] of Object.entries(counts)) {
+      const prev = prevPeerCountsRef.current[peer] ?? 0;
+      if (count < prev) {
+        console.warn(
+          `[diag] peer "${peer}": liczba wiadomości spadła ${prev} → ${count}. Stack trace poniżej.`,
+        );
+        console.trace();
+      }
+    }
+    prevPeerCountsRef.current = counts;
+  }, [peerMessagesByPeer]);
 
   // Idle detection: po 1 min bez aktywności (mouse/keyboard/touch/focus)
   // przełączamy status na AFK i informujemy server. Każda aktywność
@@ -695,13 +698,12 @@ export default function App() {
   const handleNetworkEvent = (event: NetEvent) => {
     switch (event.type) {
       case "ready": {
-        // Po połączeniu refresh kontaktów (świeże flagi online) + historia
-        // aktywnego peera (multi-device sync: dociągamy co poszło/przyszło
-        // gdy byliśmy offline albo z innego device-a).
+        // Po połączeniu refresh kontaktów (świeże flagi online). NIE robimy
+        // history-refresh — multi-device sync wystarczy przez Sent.body
+        // (live WS) + on-peer-select. Refresh w "ready" przy flaky network
+        // mógłby firewać kilka razy na minutę.
         if (settings.network.token) {
           void refreshContacts(settings.network.server_url, settings.network.token);
-          const peer = activePeerUsernameRef.current;
-          if (peer) void ensurePeerHistoryLoaded(peer);
         }
         break;
       }
