@@ -25,6 +25,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
 async-trait = "0.1"
 base64 = "0.22"
+# APNs (Apple Push Notification service) HTTP/2 client. Wymaga .p8 auth key
+# z developer.apple.com, key_id, team_id, bundle_id.
+a2 = "0.10"
 
 [profile.release]
 strip = true

@@ -740,8 +740,26 @@ async fn handle_client_event(
                 .await;
 
             // Doręczenie. Jeśli peer offline, zostawiamy w bazie z
-            // delivered_at IS NULL.
-            if state.hub.is_online(peer_id).await {
+            // delivered_at IS NULL i odpalamy push notification do jego
+            // urządzeń (jeśli APNs jest skonfigurowane i token zarejestrowany).
+            let peer_online = state.hub.is_online(peer_id).await;
+            if !peer_online {
+                if let Some(push) = state.push.clone() {
+                    let db = state.db.clone();
+                    let from = sender_username.to_string();
+                    let body_preview = body.clone();
+                    let recipient = peer_id;
+                    // Spawn — push to fire-and-forget, nie blokuje
+                    // WS handler-a (Apple HTTP/2 może mieć kilka ms RTT).
+                    tokio::spawn(async move {
+                        let unread = count_unread(&db, recipient).await;
+                        push
+                            .send_message_to(&db, recipient, &from, &body_preview, unread)
+                            .await;
+                    });
+                }
+            }
+            if peer_online {
                 state
                     .hub
                     .send_to(
@@ -916,3 +934,26 @@ async fn broadcast_presence(
 // (dla future use w heartbeacie, którego jeszcze nie skompletowaliśmy).
 #[allow(dead_code)]
 const _PING_INTERVAL: Duration = Duration::from_secs(30);
+
+/// Liczba niedoręczonych wiadomości do tego usera (plain + blob). Idzie do
+/// APNs payload jako badge count nad ikoną apki na iPhone-ie. Best-effort —
+/// błąd db = zero (zamiast crashować push).
+async fn count_unread(db: &sqlx::PgPool, recipient_id: Uuid) -> i64 {
+    let plain: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*) FROM messages
+           WHERE recipient_id = $1 AND delivered_at IS NULL"#,
+    )
+    .bind(recipient_id)
+    .fetch_one(db)
+    .await
+    .unwrap_or(0);
+    let blob: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*) FROM message_blobs
+           WHERE recipient_id = $1 AND delivered_at IS NULL"#,
+    )
+    .bind(recipient_id)
+    .fetch_one(db)
+    .await
+    .unwrap_or(0);
+    plain + blob
+}

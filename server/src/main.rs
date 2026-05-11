@@ -1,10 +1,12 @@
 mod auth;
 mod config;
 mod contacts;
+mod devices;
 mod error;
 mod history;
 mod hub;
 mod key_packages;
+mod push;
 mod state;
 mod ws;
 
@@ -48,6 +50,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/me", get(auth::handlers::me))
         .route("/me/profile", axum::routing::put(auth::handlers::update_profile))
         .route("/me/avatar", axum::routing::put(auth::handlers::update_avatar))
+        .route("/me/devices", axum::routing::post(devices::register_device))
+        .route(
+            "/me/devices/{token}",
+            axum::routing::delete(devices::unregister_device),
+        )
         .route(
             "/contacts",
             get(contacts::list_contacts).post(contacts::add_contact),
