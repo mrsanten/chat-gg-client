@@ -33,6 +33,20 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET missing}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-2592000}
       RUST_LOG: ${RUST_LOG:-info,gaidu_server=info,sqlx=warn}
+      # APNs (Apple Push Notifications). Wszystkie 4 muszą być razem w .env
+      # albo żadna — bez nich server po prostu loguje „APNs not configured"
+      # i działa bez push (push to best-effort, nie blokuje messaging-u).
+      APNS_KEY_PATH: ${APNS_KEY_PATH:-}
+      APNS_KEY_ID: ${APNS_KEY_ID:-}
+      APNS_TEAM_ID: ${APNS_TEAM_ID:-}
+      APNS_BUNDLE_ID: ${APNS_BUNDLE_ID:-}
+      APNS_ENVIRONMENT: ${APNS_ENVIRONMENT:-production}
+    volumes:
+      # Klucz .p8 z hosta jako read-only. APNS_HOST_KEY_PATH = ścieżka na
+      # VPS-ie do AuthKey_XXXXXX.p8. APNS_KEY_PATH = ta sama ścieżka, ale
+      # WEWNĄTRZ kontenera (jest też w env wyżej, server tym otwiera plik).
+      # Defaulty na /dev/null żeby compose nie pluł gdy ktoś nie używa push.
+      - ${APNS_HOST_KEY_PATH:-/dev/null}:${APNS_KEY_PATH:-/dev/null}:ro
     ports:
       # Tylko localhost — publiczny dostęp dajemy przez Caddy/nginx z TLS.
       - "127.0.0.1:8080:8080"
