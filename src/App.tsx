@@ -14,6 +14,7 @@ import { NetworkAccountDialog } from "./components/NetworkAccountDialog";
 import { AddFriendDialog } from "./components/AddFriendDialog";
 import { UserProfileDialog } from "./components/UserProfileDialog";
 import { useMobile } from "./lib/useMobile";
+import { invoke } from "@tauri-apps/api/core";
 import * as serverApi from "./lib/serverApi";
 import type { ServerContact, HistoryEntry } from "./lib/serverApi";
 import {
@@ -360,6 +361,53 @@ export default function App() {
   useEffect(() => {
     activePeerUsernameRef.current = activePeerUsername;
   }, [activePeerUsername]);
+
+  // Push notifications: native iOS code (main.mm::ApnsBootstrap) prosi
+  // o permission i zapisuje token do `<Caches>/apns_token.txt`. Polluje-my
+  // ten plik przez 60s po login-ie, POST-ujemy na server jak token się
+  // pojawi. Idempotentny (upsert na server-side), więc próby bez tokena
+  // i ponowne rejestracje są OK.
+  useEffect(() => {
+    const jwt = settings.network?.token;
+    const serverUrl = settings.network?.server_url;
+    if (!jwt || !serverUrl) return;
+    let cancelled = false;
+    let timer: number | null = null;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 12; // 12 × 5s = 60s
+    const tryRegister = async () => {
+      if (cancelled) return;
+      attempts++;
+      try {
+        const deviceToken = await invoke<string | null>("get_apns_token");
+        if (deviceToken && !cancelled) {
+          await serverApi.registerDevice(serverUrl, jwt, {
+            token: deviceToken,
+            platform: "ios",
+            app_bundle_id: "com.mrellwart.gaidugaidu",
+            // Musi pasować do APNS_ENVIRONMENT na serwerze + aps-environment
+            // w entitlements. `development` dla `pnpm tauri ios dev`,
+            // `production` dla TestFlight/App Store buildów.
+            apns_env: "development",
+          });
+          console.info("[push] device token registered on server");
+          return; // success, stop polling
+        }
+      } catch (e) {
+        // get_apns_token wywali się na ne-iOS (cfg-gated zwraca None) —
+        // wtedy debug log a nie warning, bo to expected.
+        console.debug("[push] try register attempt", attempts, e);
+      }
+      if (attempts < MAX_ATTEMPTS && !cancelled) {
+        timer = window.setTimeout(tryRegister, 5000);
+      }
+    };
+    void tryRegister();
+    return () => {
+      cancelled = true;
+      if (timer != null) window.clearTimeout(timer);
+    };
+  }, [settings.network?.token, settings.network?.server_url]);
 
   // Diagnostyka: zaloguj każde zmniejszenie liczby wiadomości na peerze.
   // Pozwala złapać moment „znikania" w DevTools console.

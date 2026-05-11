@@ -1,5 +1,6 @@
 mod chat;
 mod mls;
+mod push;
 mod sessions;
 mod settings;
 
@@ -36,6 +37,7 @@ pub fn run() {
             mls::mls_encrypt,
             mls::mls_decrypt,
             mls::mls_list_groups,
+            push::get_apns_token,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

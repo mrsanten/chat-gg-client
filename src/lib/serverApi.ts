@@ -189,6 +189,42 @@ export async function updateProfile(
   });
 }
 
+// ─────────────────────────────────── Push notifications (APNs / FCM)
+
+export interface RegisterDeviceReq {
+  token: string;
+  platform: "ios" | "android";
+  app_bundle_id: string;
+  /** "development" (Xcode dev build) albo "production" (TestFlight/App Store). */
+  apns_env: "development" | "production";
+}
+
+/** POST /me/devices — rejestruje (upsert) push token dla zalogowanego konta. */
+export async function registerDevice(
+  serverUrl: string,
+  token: string,
+  body: RegisterDeviceReq,
+): Promise<void> {
+  await request<void>("POST", serverUrl, "/me/devices", {
+    token,
+    body,
+  });
+}
+
+/** DELETE /me/devices/{token} — usuwa push token (np. przy logout). */
+export async function unregisterDevice(
+  serverUrl: string,
+  token: string,
+  deviceToken: string,
+): Promise<void> {
+  await request<void>(
+    "DELETE",
+    serverUrl,
+    `/me/devices/${encodeURIComponent(deviceToken)}`,
+    { token },
+  );
+}
+
 /** PUT /me/avatar — aktualizuje avatar usera (data URL, max ~200 KB). */
 export async function updateAvatar(
   serverUrl: string,
