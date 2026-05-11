@@ -90,10 +90,13 @@ impl PushClient {
         };
 
         for (token, _env) in &tokens {
+            // Custom sound: plik musi być w app bundle (Tauri kopiuje przez
+            // bundle.resources w tauri.conf.json). Apple szuka po nazwie
+            // pliku w mainBundle. Format CAF/AIFF/WAV (nie MP3), max 30s.
             let builder = DefaultNotificationBuilder::new()
                 .set_title(from_username)
                 .set_body(&preview)
-                .set_sound("default")
+                .set_sound("notify.caf")
                 .set_mutable_content();
             let mut payload = builder.build(
                 token,
