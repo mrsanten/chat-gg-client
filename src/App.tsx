@@ -146,6 +146,10 @@ export default function App() {
   const typingTimersRef = useRef<Map<string, number>>(new Map());
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
   const activePeerUsernameRef = useRef<string | null>(null);
+  /** Timestamp ostatniego WS "ready" event (reconnect). Używane do tłumienia
+   *  playNotify() dla wiadomości flush-owanych z offline queue — te i tak
+   *  zagrały już dźwięk na native APNs banner gdy user był offline. */
+  const lastReadyAtRef = useRef<number>(0);
   const networkRef = useRef<NetworkClient | null>(null);
   const historyLoadedFor = useRef<Set<string>>(new Set());
   // Phase 3D: mapping peer_username → group_id_b64. Populowany przy
@@ -388,7 +392,7 @@ export default function App() {
             // Musi pasować do APNS_ENVIRONMENT na serwerze + aps-environment
             // w entitlements. `development` dla `pnpm tauri ios dev`,
             // `production` dla TestFlight/App Store buildów.
-            apns_env: "development",
+            apns_env: "production",
           });
           console.info("[push] device token registered on server");
           return; // success, stop polling
@@ -746,12 +750,15 @@ export default function App() {
   const handleNetworkEvent = (event: NetEvent) => {
     switch (event.type) {
       case "ready": {
-        // Po połączeniu refresh kontaktów (świeże flagi online). NIE robimy
-        // history-refresh — multi-device sync wystarczy przez Sent.body
-        // (live WS) + on-peer-select. Refresh w "ready" przy flaky network
-        // mógłby firewać kilka razy na minutę.
+        // Po połączeniu: refresh kontaktów + history aktywnego peera.
+        // Mark lastReadyAt — używamy w case "message" żeby nie playNotify-ć
+        // dla wiadomości flushed z offline queue (dotarły jako push gdy
+        // user był offline, dźwięk już zagrał na native banner).
+        lastReadyAtRef.current = Date.now();
         if (settings.network.token) {
           void refreshContacts(settings.network.server_url, settings.network.token);
+          const peer = activePeerUsernameRef.current;
+          if (peer) void ensurePeerHistoryLoaded(peer);
         }
         break;
       }
@@ -801,6 +808,9 @@ export default function App() {
           created_at: event.created_at,
           pending: false,
         };
+        const isNew = !(peerMessagesByPeer[peer] ?? []).some(
+          (m) => m.id === msg.id,
+        );
         setPeerMessagesByPeer((prev) => {
           const cur = prev[peer] ?? [];
           if (cur.some((m) => m.id === msg.id)) return prev;
@@ -809,7 +819,15 @@ export default function App() {
         if (activePeerUsernameRef.current !== peer) {
           setUnreadByPeer((prev) => ({ ...prev, [peer]: (prev[peer] ?? 0) + 1 }));
         }
-        playNotify();
+        // Dźwięk tylko dla TRULY live wiadomości. Pomiń jeśli:
+        //  - to flush z offline queue (created_at sprzed naszego ostatniego
+        //    ready event-u → APNs banner już zagrał na mobile),
+        //  - albo wiadomość już była w state (np. po history fetch).
+        const createdAtMs = new Date(event.created_at).getTime();
+        const isFromFlushQueue = createdAtMs < lastReadyAtRef.current - 1000;
+        if (isNew && !isFromFlushQueue) {
+          playNotify();
+        }
         // Ack dopiero po dodaniu do state (idempotentne via id check).
         networkRef.current?.send({ type: "ack_delivery", message_id: event.id });
         break;
@@ -1472,7 +1490,9 @@ export default function App() {
                   );
                   if (!peerContact) return "offline";
                   if (peerContact.status === "afk") return "zaraz wraca";
-                  return peerContact.online ? "online" : "offline";
+                  if (peerContact.online) return "online";
+                  if (peerContact.status === "push_reachable") return "mobile";
+                  return "offline";
                 })()}
                 peerPresence={(() => {
                   if (
@@ -1487,7 +1507,9 @@ export default function App() {
                   );
                   if (!peerContact) return "offline";
                   if (peerContact.status === "afk") return "afk";
-                  return peerContact.online ? "online" : "offline";
+                  if (peerContact.online) return "online";
+                  if (peerContact.status === "push_reachable") return "push_reachable";
+                  return "offline";
                 })()}
                 peerUnread={unreadByPeer[activePeerUsername] ?? 0}
                 peerChat

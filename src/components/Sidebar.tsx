@@ -18,7 +18,7 @@ interface Props {
    * Status presencji do wyświetlenia pod nickiem. Komponuje się z stanem
    * sieciowym (zalogowany/łączenie/online).
    */
-  presence?: "online" | "afk" | "connecting" | "offline" | "logged_out";
+  presence?: "online" | "afk" | "push_reachable" | "connecting" | "offline" | "logged_out";
   // Phase 2B.2: lista znajomych. Pokazujemy tylko gdy networkLoggedIn.
   networkLoggedIn?: boolean;
   contacts?: ServerContact[];
@@ -190,7 +190,9 @@ export function Sidebar(props: Props) {
                         ? "gg-friend-dot--afk"
                         : c.online
                           ? "gg-friend-dot--on"
-                          : "gg-friend-dot--off"
+                          : c.status === "push_reachable"
+                            ? "gg-friend-dot--push"
+                            : "gg-friend-dot--off"
                     }`}
                   />
                   {unread > 0 && (

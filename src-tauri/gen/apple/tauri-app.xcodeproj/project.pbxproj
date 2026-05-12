@@ -169,6 +169,7 @@
 				D8D571D7BDCA1ABF2E0CB9D6 /* Sources */,
 				A4D85C1726744E26D8F01FD3 /* Resources */,
 				6EEA0490763EB982F7701E3D /* Frameworks */,
+				B1A2C3D4E5F60718293A4B5C /* Copy APNs sound to bundle root */,
 			);
 			buildRules = (
 			);
@@ -243,6 +244,25 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+		};
+		B1A2C3D4E5F60718293A4B5C /* Copy APNs sound to bundle root */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy APNs sound to bundle root";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# APNs `sound` payload szuka pliku w root-cie .app bundle. Tauri\n# bundle.resources kopiuje do assets/ subfoldera, więc kopiujemy do root-a.\nSRC=\"${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/assets/notify.caf\"\nDEST=\"${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/notify.caf\"\nif [ -f \"$SRC\" ]; then\n  cp -f \"$SRC\" \"$DEST\"\n  echo \"[apns-sound] copied $SRC -> $DEST\"\nelse\n  echo \"[apns-sound] WARN: $SRC not found, skipping\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

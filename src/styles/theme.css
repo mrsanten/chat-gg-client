@@ -1893,6 +1893,7 @@ input, textarea {
 .gg-friend-dot--on         { background-position: -126px 0; }
 .gg-friend-dot--off        { background-position: -108px 0; }
 .gg-friend-dot--afk        { background-position: -72px 0; }
+.gg-friend-dot--push       { background-position: -18px 0; } /* sprite `default` dla push-only */
 .gg-friend-dot--unread     { background-position: -54px 0; }
 .gg-friend-dot--connecting { background-position: -126px 0; opacity: 0.6; animation: gg-presence-pulse 1.2s ease-in-out infinite; }
 

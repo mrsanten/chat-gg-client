@@ -80,14 +80,20 @@ pub enum TypingState {
     Stop,
 }
 
-/// Wire-level status presence dla peerów: online/afk/offline.
-/// Online = aktywny i połączony. Afk = połączony ale nieaktywny od dłuższego
-/// czasu. Offline = brak połączenia.
+/// Wire-level status presence dla peerów.
+/// - `Online` = aktywny WS connection (jakiekolwiek urządzenie)
+/// - `Afk` = WS connected ale klient sam się oznaczył jako AFK
+/// - `PushReachable` = brak WS, ale ma zarejestrowany push token — peer może
+///   wysłać wiadomość, dotrze przez APNs. Klient nowy renderuje default
+///   sprite; stary klient (bez tego pola w protokole) traktuje `online=false`
+///   jako offline (bezpieczny fallback).
+/// - `Offline` = brak WS i brak push tokenów.
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PresenceStatus {
     Online,
     Afk,
+    PushReachable,
     Offline,
 }
 
@@ -97,6 +103,37 @@ impl From<Status> for PresenceStatus {
             Status::Online => PresenceStatus::Online,
             Status::Afk => PresenceStatus::Afk,
         }
+    }
+}
+
+/// Liczy aktualny presence usera: priorytet WS > push_reachable > offline.
+/// - Każde online WS connection (jakiekolwiek urządzenie) → Online (lub Afk
+///   jeśli user sam ustawił).
+/// - Bez WS, ale ma w `device_tokens` choć jeden rekord → PushReachable.
+/// - Inaczej → Offline.
+///
+/// Wynik to (`online_bool_legacy`, `status`). `online_bool` jest TRUE tylko
+/// dla rzeczywistego WS — stary klient (sprzed PushReachable) widzi push
+/// users jako offline, co jest bezpieczne (i tak nie umie renderować
+/// PushReachable). Nowy klient czyta `status` i renderuje default sprite.
+pub async fn derive_presence(
+    state: &crate::state::AppState,
+    account_id: Uuid,
+) -> (bool, PresenceStatus) {
+    if let Some(s) = state.hub.get_status(account_id).await {
+        return (true, s.into());
+    }
+    let has_token: bool = sqlx::query_scalar(
+        r#"SELECT EXISTS(SELECT 1 FROM device_tokens WHERE account_id = $1)"#,
+    )
+    .bind(account_id)
+    .fetch_one(&state.db)
+    .await
+    .unwrap_or(false);
+    if has_token {
+        (false, PresenceStatus::PushReachable)
+    } else {
+        (false, PresenceStatus::Offline)
     }
 }
 
@@ -235,11 +272,12 @@ async fn run_session(socket: WebSocket, state: AppState, account_id: Uuid, usern
         tracing::warn!("flush_offline_queue: {e:?}");
     }
 
-    // Jeśli właśnie przeszedł offline → online, broadcast presence do
-    // każdego, kto ma go w kontaktach. Default status = Online (świeży login
-    // zawsze startuje od Online — AFK reset w hub::unregister).
+    // Jeśli właśnie przeszedł z (offline / push_reachable) → online, broadcast
+    // presence do każdego, kto ma go w kontaktach. Świeży login zawsze
+    // startuje od Online (AFK reset w hub::unregister).
     if was_offline {
-        broadcast_presence(&state, account_id, &username, true, PresenceStatus::Online).await;
+        let (online, status) = derive_presence(&state, account_id).await;
+        broadcast_presence(&state, account_id, &username, online, status).await;
     }
 
     // ── send-loop: czyta `rx` i wypycha do socketu
@@ -313,10 +351,13 @@ async fn run_session(socket: WebSocket, state: AppState, account_id: Uuid, usern
         _ = recv_task => {},
     }
 
-    // Cleanup. Jeśli to ostatnie połączenie tego usera, broadcast offline.
+    // Cleanup. Jeśli to ostatnie połączenie tego usera, broadcast nowy
+    // status — `Offline` jeśli nie ma push tokenów, albo `PushReachable`
+    // jeśli ma (mobile app w tle ale można jeszcze dorwać przez APNs).
     let now_offline = state.hub.unregister(account_id, conn_id).await;
     if now_offline {
-        broadcast_presence(&state, account_id, &username, false, PresenceStatus::Offline).await;
+        let (online, status) = derive_presence(&state, account_id).await;
+        broadcast_presence(&state, account_id, &username, online, status).await;
     }
 }
 
@@ -903,7 +944,7 @@ async fn flush_offline_queue(
     Ok(())
 }
 
-async fn broadcast_presence(
+pub async fn broadcast_presence(
     state: &AppState,
     account_id: Uuid,
     username: &str,

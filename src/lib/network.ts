@@ -57,9 +57,10 @@ export type ServerEvent =
       type: "presence";
       username: string;
       online: boolean;
-      /** Pole dodane w v0.13 (AFK). Stary serwer nie wyśle — interpretujemy
-       *  jako online jeśli online=true, offline jeśli online=false. */
-      status?: "online" | "afk" | "offline";
+      /** Pole dodane w v0.13 (AFK + push_reachable). Stary serwer nie wyśle
+       *  — interpretujemy jako online jeśli online=true, offline jeśli false.
+       *  `push_reachable`: user nie ma WS ale ma zarejestrowany push token. */
+      status?: "online" | "afk" | "push_reachable" | "offline";
     }
   | {
       type: "blob";

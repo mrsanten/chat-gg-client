@@ -1,7 +1,7 @@
 use crate::auth::AuthUser;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use crate::ws::PresenceStatus;
+use crate::ws::{derive_presence, PresenceStatus};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -100,13 +100,7 @@ pub async fn add_contact(
     .await?;
     tx.commit().await?;
 
-    let status = state
-        .hub
-        .get_status(peer.0)
-        .await
-        .map(PresenceStatus::from)
-        .unwrap_or(PresenceStatus::Offline);
-    let online = !matches!(status, PresenceStatus::Offline);
+    let (online, status) = derive_presence(&state, peer.0).await;
     let view = ContactView {
         peer_id: peer.0,
         username: peer.1,
@@ -140,13 +134,7 @@ pub async fn list_contacts(
 
     let mut out = Vec::with_capacity(rows.len());
     for r in rows {
-        let status = state
-            .hub
-            .get_status(r.peer_id)
-            .await
-            .map(PresenceStatus::from)
-            .unwrap_or(PresenceStatus::Offline);
-        let online = !matches!(status, PresenceStatus::Offline);
+        let (online, status) = derive_presence(&state, r.peer_id).await;
         out.push(ContactView {
             peer_id: r.peer_id,
             username: r.username,

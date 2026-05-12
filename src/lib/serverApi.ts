@@ -27,7 +27,7 @@ export interface ServerContact {
   created_at: string;
   online: boolean;
   /** Granularny status. Brak (stary serwer) → online jeśli `online=true`. */
-  status?: "online" | "afk" | "offline";
+  status?: "online" | "afk" | "push_reachable" | "offline";
   description?: string;
   /** Avatar peera jako data URL. Pusty/brak = brak (renderujemy default). */
   avatar?: string;

@@ -14,6 +14,7 @@
 use crate::auth::AuthUser;
 use crate::error::AppResult;
 use crate::state::AppState;
+use crate::ws::{broadcast_presence, derive_presence};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -60,6 +61,17 @@ pub async fn register_device(
             "token jest wymagany i ma <= 200 znaków".into(),
         ));
     }
+    // Czy user był offline (bez tokenów) przed tym insert-em? Jak tak, po
+    // upsert-cie zrobi się PushReachable i trzeba broadcastnąć peerom.
+    let was_no_token_and_offline: bool = !state.hub.is_online(user.account_id).await
+        && !sqlx::query_scalar::<_, bool>(
+            r#"SELECT EXISTS(SELECT 1 FROM device_tokens WHERE account_id = $1)"#,
+        )
+        .bind(user.account_id)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(false);
+
     sqlx::query(
         r#"
         INSERT INTO device_tokens (account_id, platform, token, app_bundle_id, apns_env, updated_at)
@@ -78,6 +90,21 @@ pub async fn register_device(
     .bind(&req.apns_env)
     .execute(&state.db)
     .await?;
+
+    if was_no_token_and_offline {
+        // Pobierz username (sender_username dla broadcast).
+        if let Ok(username) = sqlx::query_scalar::<_, String>(
+            r#"SELECT username FROM accounts WHERE id = $1"#,
+        )
+        .bind(user.account_id)
+        .fetch_one(&state.db)
+        .await
+        {
+            let (online, status) = derive_presence(&state, user.account_id).await;
+            broadcast_presence(&state, user.account_id, &username, online, status).await;
+        }
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }
 

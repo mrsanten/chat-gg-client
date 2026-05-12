@@ -8,7 +8,7 @@ interface Props {
   messages: ChatMessage[];
   sessionTitle?: string | null;
   /** Peer presence — pokazujemy ikonę zamiast słońca w nagłówku czatu z kontaktem. */
-  peerPresence?: "online" | "afk" | "offline" | "connecting" | null;
+  peerPresence?: "online" | "afk" | "push_reachable" | "offline" | "connecting" | null;
   /** Liczba nieprzeczytanych dla aktywnego peera; >0 włącza miganie ikony. */
   peerUnread?: number;
   /** True gdy to czat z kontaktem (nie z AI) — włącza render emotek. */
@@ -41,9 +41,11 @@ export function Conversation({
       ? "gg-friend-dot--on"
       : peerPresence === "afk"
         ? "gg-friend-dot--afk"
-        : peerPresence === "offline"
-          ? "gg-friend-dot--off"
-          : "gg-friend-dot--connecting"
+        : peerPresence === "push_reachable"
+          ? "gg-friend-dot--push"
+          : peerPresence === "offline"
+            ? "gg-friend-dot--off"
+            : "gg-friend-dot--connecting"
     : null;
   const showUnreadBlink = !!peerPresence && (peerUnread ?? 0) > 0;
 

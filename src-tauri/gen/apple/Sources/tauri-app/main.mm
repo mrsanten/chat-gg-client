@@ -132,6 +132,11 @@ static void apns_did_fail(id self, SEL _cmd,
 @end
 
 int main(int argc, char * argv[]) {
+	// Wymuś load symbolu — bez tego linker może strip-nąć ApnsBootstrap
+	// (klasa nie jest nigdzie explicit referenced w Rust/C++, tylko przez
+	// `+load` runtime). Tutaj „touchujemy" klasę żeby ObjC runtime ją
+	// załadował i wywołał `+load`.
+	[ApnsBootstrap class];
 	ffi::start_app();
 	return 0;
 }
