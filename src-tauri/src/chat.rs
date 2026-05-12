@@ -361,10 +361,14 @@ async fn run_codex(
     let mut cmd = Command::new(bin);
     cmd.arg("exec")
         .arg("--json")
-        .arg("--skip-git-repo-check")
-        .arg("--model")
-        .arg(model)
-        .arg(&last_user.content)
+        .arg("--skip-git-repo-check");
+    // Pusty apiModelId w models.ts → Codex CLI używa swojego default-a (np.
+    // gpt-5-codex dla ChatGPT-account auth). Wskaż konkretny tylko gdy user
+    // chce override.
+    if !model.is_empty() {
+        cmd.arg("--model").arg(model);
+    }
+    cmd.arg(&last_user.content)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -448,9 +452,45 @@ async fn run_codex(
                     final_assistant_text = Some(text.to_string());
                 }
             }
-            "task_complete" | "task_finished" | "done" | "completed" => {
+            "task_complete" | "task_finished" | "done" | "completed"
+            | "thread.completed" | "response.completed" | "turn.completed" => {
                 break;
             }
+            // Codex CLI v0.40+: item.completed z text-em w `item.text`. Type
+            // item.type='agent_message' to finalna odpowiedź (są też
+            // 'tool_call', 'reasoning' itd — ignorujemy).
+            "item.completed" | "response.output_text.done" => {
+                let item = payload.get("item").unwrap_or(payload);
+                let item_type = item
+                    .get("type")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("");
+                if item_type == "agent_message" || item_type.is_empty() {
+                    if let Some(text) = item
+                        .get("text")
+                        .and_then(|t| t.as_str())
+                        .or_else(|| item.get("output_text").and_then(|t| t.as_str()))
+                        .or_else(|| payload.get("text").and_then(|t| t.as_str()))
+                    {
+                        final_assistant_text = Some(text.to_string());
+                    }
+                }
+            }
+            // Stream delta w nowym formacie
+            "response.output_text.delta" | "item.delta" => {
+                if let Some(text) = payload
+                    .get("delta")
+                    .and_then(|t| t.as_str())
+                    .or_else(|| payload.get("text").and_then(|t| t.as_str()))
+                {
+                    got_delta = true;
+                    let _ = channel.send(StreamEvent::Delta {
+                        text: text.to_string(),
+                    });
+                }
+            }
+            // No-op events — wstępne sygnały lifecycle
+            "thread.started" | "turn.started" | "item.started" => {}
             "error" | "task_failed" => {
                 let msg = payload
                     .get("message")
