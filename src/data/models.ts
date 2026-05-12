@@ -5,11 +5,16 @@ export const MODELS: ToolModel[] = [
     id: "gpt-5.4",
     name: "GPT-5.4",
     provider: "openai",
-    // Codex CLI z ChatGPT-account auth (subskrypcja, nie API key). Apple/OAI
-    // accepts tylko specjalizowane modele: gpt-5-codex (default), o4-mini.
-    // Generalne gpt-5/gpt-4o* są tylko przez API-key auth. Pusty string =
-    // pomiń --model flag-ę, niech Codex CLI sam wybierze swój default.
-    apiModelId: "",
+    // Dla API-key auth: gpt-4o (flagship OpenAI).
+    // Dla Codex CLI auth: providers.ts override-uje na pusty string,
+    // Codex użyje swojego defaultu (gpt-5-codex lub podobny).
+    apiModelId: "gpt-4o",
+  },
+  {
+    id: "gpt-3.5-turbo",
+    name: "GPT 3.5 Turbo",
+    provider: "openai",
+    apiModelId: "gpt-3.5-turbo",
   },
   {
     id: "opus-4.7",

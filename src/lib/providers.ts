@@ -37,7 +37,10 @@ function buildRequest(model: ToolModel, settings: Settings): RustRequest {
   }
   if (model.provider === "openai") {
     if (settings.openai.auth.mode === "codex") {
-      return { kind: "codex", model: model.apiModelId };
+      // Codex CLI z ChatGPT-account auth używa swojego defaultu (gpt-5-codex
+      // lub podobny). Ignorujemy apiModelId — nawet jeśli wskazuje "gpt-4o-mini"
+      // (dla API path), Codex CLI by go odrzucił.
+      return { kind: "codex", model: "" };
     }
     return { kind: "open_ai", model: model.apiModelId };
   }
