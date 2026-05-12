@@ -129,6 +129,35 @@ static void apns_did_fail(id self, SEL _cmd,
                     | UNNotificationPresentationOptionList);
 }
 
+// Tap na banner / lockscreen notyfikacji → otwórz konwersację z tym peerem.
+// Server APNs payload zawiera custom field `peer` z username nadawcy. Tu
+// zapisujemy do <Caches>/apns_pending_open.txt; JS po starcie/focus reads
+// ten plik (przez Rust command get_apns_pending_open) i wywołuje
+// onSelectPeer(username).
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+didReceiveNotificationResponse:(UNNotificationResponse *)response
+         withCompletionHandler:(void (^)(void))completionHandler {
+    NSDictionary *userInfo = response.notification.request.content.userInfo;
+    id peer = userInfo[@"peer"];
+    if ([peer isKindOfClass:[NSString class]]) {
+        NSArray<NSString *> *paths = NSSearchPathForDirectoriesInDomains(
+            NSCachesDirectory, NSUserDomainMask, YES);
+        NSString *path = [paths.firstObject
+            stringByAppendingPathComponent:@"apns_pending_open.txt"];
+        NSError *err = nil;
+        BOOL ok = [(NSString *)peer writeToFile:path
+                                     atomically:YES
+                                       encoding:NSUTF8StringEncoding
+                                          error:&err];
+        if (!ok) {
+            NSLog(@"[apns] failed to save pending_open: %@", err);
+        } else {
+            NSLog(@"[apns] pending_open=%@", peer);
+        }
+    }
+    completionHandler();
+}
+
 @end
 
 int main(int argc, char * argv[]) {

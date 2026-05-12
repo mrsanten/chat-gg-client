@@ -111,6 +111,10 @@ impl PushClient {
                 // a2 0.10: aps to struct (nie Option), ustawiamy bezpośrednio.
                 payload.aps.badge = Some(b);
             }
+            // Custom data — `peer` to username nadawcy. Native iOS handler
+            // czyta to przy tapie notyfikacji i otwiera odpowiednią
+            // konwersację (deep-link).
+            let _ = payload.add_custom_data("peer", &serde_json::json!(from_username));
 
             match self.inner.send(payload).await {
                 Ok(resp) if resp.code == 200 => {

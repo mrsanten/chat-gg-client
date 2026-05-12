@@ -413,6 +413,62 @@ export default function App() {
     };
   }, [settings.network?.token, settings.network?.server_url]);
 
+  // VisualViewport — gdy klawiatura otwiera się na iOS, `window.visualViewport`
+  // ma świeżą wysokość bez klawiatury. Eksportujemy ją jako CSS var `--vvh`
+  // (i także offset top jako `--vvt`). `.gg-window` używa `--vvh` jako
+  // height-u. Dzięki temu layout kurczy się z keyboard-em zamiast pchać
+  // wszystko do góry pod toolbar.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const update = () => {
+      root.style.setProperty("--vvh", `${vv.height}px`);
+      root.style.setProperty("--vvt", `${vv.offsetTop}px`);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+
+  // APNs deep-link: native iOS handler zapisał username do
+  // `<Caches>/apns_pending_open.txt` gdy user tapnął notyfikację. Polluje-my
+  // ten plik przy boot, focus i każdym ready event. Po odczycie Rust go
+  // usuwa (read-once). Jak peer istnieje w naszej liście kontaktów, otwórz
+  // z nim czat.
+  const tryOpenPendingPeer = async () => {
+    if (!settings.network?.token) return;
+    try {
+      const peer = await invoke<string | null>("get_apns_pending_open");
+      if (!peer) return;
+      const exists = contacts.some(
+        (c) => c.username.toLowerCase() === peer.toLowerCase(),
+      );
+      if (exists) {
+        onSelectPeer(peer);
+      } else {
+        console.warn("[push] pending peer not in contacts:", peer);
+      }
+    } catch (e) {
+      console.debug("[push] get_apns_pending_open:", e);
+    }
+  };
+  // Ref na latest version (closure dla event listenerów).
+  const tryOpenPendingPeerRef = useRef(tryOpenPendingPeer);
+  useEffect(() => {
+    tryOpenPendingPeerRef.current = tryOpenPendingPeer;
+  });
+  useEffect(() => {
+    void tryOpenPendingPeerRef.current();
+    const onFocus = () => void tryOpenPendingPeerRef.current();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+
   // Diagnostyka: zaloguj każde zmniejszenie liczby wiadomości na peerze.
   // Pozwala złapać moment „znikania" w DevTools console.
   const prevPeerCountsRef = useRef<Record<string, number>>({});

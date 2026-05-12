@@ -2420,11 +2420,22 @@ input, textarea {
 }
 
 @media (max-width: 768px) {
-  /* Cała aplikacja zajmuje 100% wysokości viewportu, bez okiennych dekoracji */
+  /* Cała aplikacja zajmuje wysokość VISUAL viewportu (bez klawiatury).
+     `--vvh` jest ustawiany przez VisualViewport API w App.tsx i aktualizuje
+     się w czasie rzeczywistym gdy otwiera/zamyka się klawiatura. Fallback
+     do `100dvh` (iOS 16.4+) potem `100vh`. Plus `body{position:fixed}`
+     blokuje iOS-owi przewijanie dokumentu pod klawiaturą. */
+  html, body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
   .gg-window {
     height: 100vh;
-    height: 100dvh; /* dynamic viewport — zachowuje się sensownie gdy
-                       Safari/Chrome chowa/pokazuje URL bar */
+    height: 100dvh;
+    height: var(--vvh, 100dvh);
   }
 
   /* Tytułbar + menubar — chowamy. OS sam zarządza */

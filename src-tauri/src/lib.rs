@@ -38,6 +38,7 @@ pub fn run() {
             mls::mls_decrypt,
             mls::mls_list_groups,
             push::get_apns_token,
+            push::get_apns_pending_open,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

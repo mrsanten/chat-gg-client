@@ -39,3 +39,37 @@ fn caches_token_path() -> Option<PathBuf> {
         None
     }
 }
+
+/// Odczytuje pending deep-link z tapnięcia notyfikacji APNs. Native iOS
+/// `didReceiveNotificationResponse` zapisuje username nadawcy do
+/// `<Caches>/apns_pending_open.txt`. JS polluje to po starcie i przy `focus`;
+/// po przeczytaniu plik jest USUWANY (read-once, żeby nie otwierać tego
+/// samego peera w kółko przy każdym focus).
+#[tauri::command]
+pub fn get_apns_pending_open() -> Option<String> {
+    let path = caches_pending_open_path()?;
+    let raw = std::fs::read_to_string(&path).ok()?;
+    let _ = std::fs::remove_file(&path);
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn caches_pending_open_path() -> Option<PathBuf> {
+    #[cfg(target_os = "ios")]
+    {
+        let home = std::env::var_os("HOME")?;
+        let mut path = PathBuf::from(home);
+        path.push("Library");
+        path.push("Caches");
+        path.push("apns_pending_open.txt");
+        Some(path)
+    }
+    #[cfg(not(target_os = "ios"))]
+    {
+        None
+    }
+}
