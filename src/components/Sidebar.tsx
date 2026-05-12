@@ -1,7 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import sunIcon from "../assets/sun.svg";
 import type { SessionMeta, ToolModel } from "../types";
 import type { ServerContact } from "../lib/serverApi";
+
+function clock(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 interface Props {
   models: ToolModel[];
@@ -84,6 +90,19 @@ export function Sidebar(props: Props) {
 
   const [openTools, setOpenTools] = useState(true);
   const [openHistory, setOpenHistory] = useState(true);
+  // Mobile-only: w sidebar footer pokazujemy zegar + wersję (statusbar
+  // ukryty na mobile). Update co 30s wystarczy — zegar nie musi tickować.
+  const [time, setTime] = useState(clock());
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    const t = window.setInterval(() => setTime(clock()), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
+  useEffect(() => {
+    getVersion()
+      .then(setVersion)
+      .catch(() => setVersion(null));
+  }, []);
   const [openFriends, setOpenFriends] = useState(true);
 
   const activeModel = models.find((m) => m.id === activeModelId);
@@ -306,6 +325,10 @@ export function Sidebar(props: Props) {
             <span className="gg-sidebar-ad-text">A czy ty zjadłeś japuszko? Larry patrzy!</span>
           </div>
         </a>
+        <div className="gg-sidebar-mobile-status" aria-hidden>
+          <span>{time}</span>
+          {version && <span>v{version}</span>}
+        </div>
       </div>
       </aside>
     </>

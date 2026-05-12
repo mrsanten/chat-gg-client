@@ -2519,9 +2519,16 @@ input, textarea {
     width: 100%;
   }
 
-  /* Statusbar może zostać ale niech ma safe-area */
+  /* Statusbar (data + wersja + sygnał) ukryty na mobile — przeniesione do
+     sidebar footera (gg-sidebar-mobile-status). */
   .gg-statusbar {
-    padding-bottom: env(safe-area-inset-bottom);
+    display: none;
+  }
+
+  /* Window: bez okiennej ramki na mobile (full-screen). */
+  .gg-window {
+    border: none;
+    box-shadow: none;
   }
 
   /* Conversation + chat header — bez gridów, pełna szerokość */
@@ -2607,6 +2614,21 @@ input, textarea {
   .gg-sidebar-ad {
     display: none;
   }
+
+  /* Mobile: zegar + wersja w sidebar footerze (statusbar ukryty) */
+  .gg-sidebar-mobile-status {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text-mute);
+    border-top: 1px solid var(--xp-face-line);
+  }
+}
+
+/* Desktop: mobile-status block ukryty (statusbar pełni tę rolę) */
+.gg-sidebar-mobile-status {
+  display: none;
 }
 
 /* Bardzo wąskie ekrany (iPhone SE landscape itp.) — jeszcze ciaśniej */
