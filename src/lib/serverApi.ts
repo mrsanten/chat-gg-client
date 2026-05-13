@@ -266,6 +266,145 @@ export async function removeContact(
   });
 }
 
+// ─────────────────────────────────── Groups
+
+export interface ServerGroup {
+  id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+  my_role: "admin" | "member";
+  member_count: number;
+}
+
+export interface ServerGroupMember {
+  account_id: string;
+  username: string;
+  role: "admin" | "member";
+  joined_at: string;
+  avatar?: string;
+}
+
+export interface ServerGroupMessage {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  sender_username: string;
+  body: string;
+  created_at: string;
+}
+
+/** POST /groups — tworzy grupę, autor staje się adminem. */
+export async function createGroup(
+  serverUrl: string,
+  token: string,
+  name: string,
+  memberUsernames: string[],
+): Promise<ServerGroup> {
+  return request<ServerGroup>("POST", serverUrl, "/groups", {
+    token,
+    body: { name, member_usernames: memberUsernames },
+  });
+}
+
+/** GET /groups — lista moich grup. */
+export async function listGroups(
+  serverUrl: string,
+  token: string,
+): Promise<ServerGroup[]> {
+  return request<ServerGroup[]>("GET", serverUrl, "/groups", { token });
+}
+
+/** GET /groups/{id}/members — lista członków. */
+export async function listGroupMembers(
+  serverUrl: string,
+  token: string,
+  groupId: string,
+): Promise<ServerGroupMember[]> {
+  return request<ServerGroupMember[]>(
+    "GET",
+    serverUrl,
+    `/groups/${encodeURIComponent(groupId)}/members`,
+    { token },
+  );
+}
+
+/** PATCH /groups/{id} — zmień nazwę grupy (admin only). */
+export async function updateGroup(
+  serverUrl: string,
+  token: string,
+  groupId: string,
+  name: string,
+): Promise<void> {
+  await request<void>("PATCH", serverUrl, `/groups/${encodeURIComponent(groupId)}`, {
+    token,
+    body: { name },
+  });
+}
+
+/** POST /groups/{id}/members — dodaj członka po username (admin only). */
+export async function addGroupMember(
+  serverUrl: string,
+  token: string,
+  groupId: string,
+  username: string,
+): Promise<void> {
+  await request<void>(
+    "POST",
+    serverUrl,
+    `/groups/${encodeURIComponent(groupId)}/members`,
+    { token, body: { username } },
+  );
+}
+
+/** DELETE /groups/{id}/members/{user_id} — usuń (admin) albo opuść (self). */
+export async function removeGroupMember(
+  serverUrl: string,
+  token: string,
+  groupId: string,
+  userId: string,
+): Promise<void> {
+  await request<void>(
+    "DELETE",
+    serverUrl,
+    `/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}`,
+    { token },
+  );
+}
+
+/** DELETE /groups/{id} — usuń grupę (admin only, cascade). */
+export async function deleteGroup(
+  serverUrl: string,
+  token: string,
+  groupId: string,
+): Promise<void> {
+  await request<void>(
+    "DELETE",
+    serverUrl,
+    `/groups/${encodeURIComponent(groupId)}`,
+    { token },
+  );
+}
+
+/** GET /groups/{id}/history — historia wiadomości grupy. */
+export async function fetchGroupHistory(
+  serverUrl: string,
+  token: string,
+  groupId: string,
+  opts: { limit?: number; before?: string } = {},
+): Promise<ServerGroupMessage[]> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.before) params.set("before", opts.before);
+  const qs = params.toString() ? `?${params}` : "";
+  return request<ServerGroupMessage[]>(
+    "GET",
+    serverUrl,
+    `/groups/${encodeURIComponent(groupId)}/history${qs}`,
+    { token },
+  );
+}
+
 export async function fetchHistory(
   serverUrl: string,
   token: string,

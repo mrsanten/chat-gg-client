@@ -71,6 +71,18 @@ pub enum ClientEvent {
     /// Klient ustawia własny status presence (online / afk).
     /// Server broadcastuje peerom przez `Presence`.
     SetStatus { status: Status },
+    /// Wyślij wiadomość do grupy (wszyscy członkowie dostają fan-out).
+    SendGroupMessage {
+        group_id: Uuid,
+        body: String,
+        #[serde(default)]
+        client_msg_id: Option<String>,
+    },
+    /// Typing indicator w grupie. Fan-out do wszystkich członków oprócz nadawcy.
+    TypingGroup {
+        group_id: Uuid,
+        state: TypingState,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -197,6 +209,34 @@ pub enum ServerEvent {
         from: String,
         ciphertext: String,  // base64
         created_at: DateTime<Utc>,
+    },
+    /// Nowa wiadomość w grupie — przyszła do tego członka.
+    GroupMessage {
+        id: Uuid,
+        group_id: Uuid,
+        from: String,
+        body: String,
+        created_at: DateTime<Utc>,
+    },
+    /// Echo nadawcy wiadomości grupowej — analog `Sent` dla peer chat.
+    SentGroup {
+        id: Uuid,
+        group_id: Uuid,
+        client_msg_id: Option<String>,
+        body: String,
+        created_at: DateTime<Utc>,
+    },
+    /// Lista kontaktów się zmieniła (add/remove). Klient powinien wywołać
+    /// GET /contacts żeby zassać świeży stan.
+    ContactsChanged,
+    /// Lista grup / członkostwo / nazwa się zmieniły. Klient wywoła
+    /// GET /groups i ewentualnie /groups/:id/members.
+    GroupsChanged,
+    /// Typing indicator w grupie (analog Typing dla peer chat).
+    GroupTyping {
+        group_id: Uuid,
+        from: String,
+        state: TypingState,
     },
     /// Pong na ping.
     Pong,
@@ -383,6 +423,161 @@ async fn handle_client_event(
                     new_status.into(),
                 )
                 .await;
+            }
+        }
+        ClientEvent::SendGroupMessage {
+            group_id,
+            body,
+            client_msg_id,
+        } => {
+            if body.is_empty() {
+                let _ = tx
+                    .send(ServerEvent::Error {
+                        code: "empty_body".into(),
+                        message: "wiadomość nie może być pusta".into(),
+                    })
+                    .await;
+                return;
+            }
+            if body.len() > 64 * 1024 {
+                let _ = tx
+                    .send(ServerEvent::Error {
+                        code: "body_too_large".into(),
+                        message: "wiadomość większa niż 64 KiB".into(),
+                    })
+                    .await;
+                return;
+            }
+            // Sprawdź że nadawca jest członkiem grupy
+            let is_member: bool = sqlx::query_scalar(
+                r#"SELECT EXISTS(SELECT 1 FROM group_members WHERE group_id = $1 AND account_id = $2)"#,
+            )
+            .bind(group_id)
+            .bind(sender_id)
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or(false);
+            if !is_member {
+                let _ = tx
+                    .send(ServerEvent::Error {
+                        code: "not_member".into(),
+                        message: "nie jesteś członkiem tej grupy".into(),
+                    })
+                    .await;
+                return;
+            }
+            // Insert
+            let inserted: Result<(Uuid, DateTime<Utc>), sqlx::Error> = sqlx::query_as(
+                r#"
+                INSERT INTO group_messages (group_id, sender_id, body)
+                VALUES ($1, $2, $3)
+                RETURNING id, created_at
+                "#,
+            )
+            .bind(group_id)
+            .bind(sender_id)
+            .bind(&body)
+            .fetch_one(&state.db)
+            .await;
+            let (msg_id, created_at) = match inserted {
+                Ok(x) => x,
+                Err(e) => {
+                    tracing::error!("insert group_message: {e:?}");
+                    let _ = tx
+                        .send(ServerEvent::Error {
+                            code: "db".into(),
+                            message: "nie udało się zapisać wiadomości".into(),
+                        })
+                        .await;
+                    return;
+                }
+            };
+            // Echo do nadawcy (wszystkie jego device-y)
+            state
+                .hub
+                .send_to(
+                    sender_id,
+                    ServerEvent::SentGroup {
+                        id: msg_id,
+                        group_id,
+                        client_msg_id: client_msg_id.clone(),
+                        body: body.clone(),
+                        created_at,
+                    },
+                )
+                .await;
+            // Pobierz członków (oprócz nadawcy) i fan-out
+            let member_ids: Vec<Uuid> = sqlx::query_scalar(
+                r#"SELECT account_id FROM group_members
+                   WHERE group_id = $1 AND account_id <> $2"#,
+            )
+            .bind(group_id)
+            .bind(sender_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
+            for member_id in &member_ids {
+                state
+                    .hub
+                    .send_to(
+                        *member_id,
+                        ServerEvent::GroupMessage {
+                            id: msg_id,
+                            group_id,
+                            from: sender_username.to_string(),
+                            body: body.clone(),
+                            created_at,
+                        },
+                    )
+                    .await;
+            }
+            // Push do offline członków (jak peer message, best-effort)
+            if let Some(push) = state.push.clone() {
+                let db = state.db.clone();
+                let from = sender_username.to_string();
+                let preview = body.clone();
+                let offline_members: Vec<Uuid> = {
+                    let mut out = Vec::new();
+                    for m in &member_ids {
+                        if !state.hub.is_online(*m).await {
+                            out.push(*m);
+                        }
+                    }
+                    out
+                };
+                let push_clone = push.clone();
+                tokio::spawn(async move {
+                    for recipient in offline_members {
+                        push_clone
+                            .send_message_to(&db, recipient, &from, &preview, 0)
+                            .await;
+                    }
+                });
+            }
+        }
+        ClientEvent::TypingGroup { group_id, state: ts } => {
+            // Sprawdź członkostwo + fan-out do wszystkich oprócz nadawcy.
+            let members: Vec<Uuid> = sqlx::query_scalar(
+                r#"SELECT account_id FROM group_members
+                   WHERE group_id = $1 AND account_id <> $2"#,
+            )
+            .bind(group_id)
+            .bind(sender_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
+            for m in members {
+                state
+                    .hub
+                    .send_to(
+                        m,
+                        ServerEvent::GroupTyping {
+                            group_id,
+                            from: sender_username.to_string(),
+                            state: ts.clone(),
+                        },
+                    )
+                    .await;
             }
         }
         ClientEvent::AckDelivery { message_id } => {

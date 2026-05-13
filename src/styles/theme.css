@@ -1894,6 +1894,7 @@ input, textarea {
 .gg-friend-dot--off        { background-position: -108px 0; }
 .gg-friend-dot--afk        { background-position: -72px 0; }
 .gg-friend-dot--push       { background-position: -18px 0; } /* sprite `default` dla push-only */
+.gg-friend-dot--group      { background-position: -36px 0; } /* sprite `group-chat` */
 .gg-friend-dot--unread     { background-position: -54px 0; }
 .gg-friend-dot--connecting { background-position: -126px 0; opacity: 0.6; animation: gg-presence-pulse 1.2s ease-in-out infinite; }
 
@@ -2650,4 +2651,43 @@ input, textarea {
   .gg-toolbar-btn-label {
     display: none;
   }
+}
+
+/* CreateGroupDialog — lista kontaktów do wyboru jako członkowie. */
+.gg-creategroup-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--xp-face-line);
+  background: var(--xp-face-light);
+}
+.gg-creategroup-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--xp-face-line);
+  cursor: pointer;
+  font-size: 12px;
+}
+.gg-creategroup-row:hover {
+  background: #d6e4ff;
+}
+.gg-creategroup-row:last-child {
+  border-bottom: none;
+}
+.gg-creategroup-row input[type="checkbox"] {
+  margin: 0;
+  flex-shrink: 0;
+}
+.gg-creategroup-meta {
+  color: var(--text-mute);
+  font-size: 11px;
+}
+[data-theme="dark"] .gg-creategroup-list {
+  background: var(--xp-face);
+}
+[data-theme="dark"] .gg-creategroup-row:hover {
+  background: #2c3a55;
 }

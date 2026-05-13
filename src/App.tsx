@@ -13,6 +13,8 @@ import { ChangelogDialog } from "./components/ChangelogDialog";
 import { NetworkAccountDialog } from "./components/NetworkAccountDialog";
 import { AddFriendDialog } from "./components/AddFriendDialog";
 import { UserProfileDialog } from "./components/UserProfileDialog";
+import { CreateGroupDialog } from "./components/CreateGroupDialog";
+import { GroupProfileDialog } from "./components/GroupProfileDialog";
 import { useMobile } from "./lib/useMobile";
 import { invoke } from "@tauri-apps/api/core";
 import * as serverApi from "./lib/serverApi";
@@ -125,6 +127,15 @@ export default function App() {
   >("loading");
   const [addFriendOpen, setAddFriendOpen] = useState(false);
   const [contacts, setContacts] = useState<ServerContact[]>([]);
+  const [groups, setGroups] = useState<serverApi.ServerGroup[]>([]);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [groupMessagesByGroup, setGroupMessagesByGroup] = useState<
+    Record<string, PeerMessage[]>
+  >({});
+  const [unreadByGroup, setUnreadByGroup] = useState<Record<string, number>>({});
+  const activeGroupIdRef = useRef<string | null>(null);
+  const [createGroupOpen, setCreateGroupOpen] = useState(false);
+  const [groupProfileOpen, setGroupProfileOpen] = useState(false);
   const [myDescription, setMyDescription] = useState<string>("");
   const [myAvatar, setMyAvatar] = useState<string>("");
   const [myJoinedAt, setMyJoinedAt] = useState<string>("");
@@ -144,6 +155,11 @@ export default function App() {
   const [netStats, setNetStats] = useState<NetworkStats | null>(null);
   const [typingByPeer, setTypingByPeer] = useState<Record<string, boolean>>({});
   const typingTimersRef = useRef<Map<string, number>>(new Map());
+  /** Per-grupa: zbiór username-ów aktualnie piszących (oprócz mnie). */
+  const [typingByGroup, setTypingByGroup] = useState<Record<string, Set<string>>>(
+    {},
+  );
+  const groupTypingTimersRef = useRef<Map<string, number>>(new Map());
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
   const activePeerUsernameRef = useRef<string | null>(null);
   /** Timestamp ostatniego WS "ready" event (reconnect). Używane do tłumienia
@@ -208,6 +224,7 @@ export default function App() {
       if (s.network?.token && s.network.server_url) {
         const tryRestore = async (currentSettings: typeof s, accountId: string) => {
           void refreshContacts(currentSettings.network.server_url, currentSettings.network.token);
+          void refreshGroups(currentSettings.network.server_url, currentSettings.network.token);
           try {
             const raw = localStorage.getItem(`peer-msgs:${accountId}`);
             if (raw) {
@@ -365,6 +382,18 @@ export default function App() {
   useEffect(() => {
     activePeerUsernameRef.current = activePeerUsername;
   }, [activePeerUsername]);
+
+  useEffect(() => {
+    activeGroupIdRef.current = activeGroupId;
+  }, [activeGroupId]);
+
+  // Jeśli zostałem usunięty z grupy / grupa skasowana — `groups` z servera
+  // już jej nie zawiera, a `activeGroupId` wciąż wskazuje. Zamknij chat.
+  useEffect(() => {
+    if (activeGroupId && !groups.some((g) => g.id === activeGroupId)) {
+      setActiveGroupId(null);
+    }
+  }, [groups, activeGroupId]);
 
   // Push notifications: native iOS code (main.mm::ApnsBootstrap) prosi
   // o permission i zapisuje token do `<Caches>/apns_token.txt`. Polluje-my
@@ -645,6 +674,7 @@ export default function App() {
       setIsStreaming(false);
     }
     setActivePeerUsername(null);
+    setActiveGroupId(null);
     setActiveModelId(id);
     if (!(id in activeSessionByModel)) {
       const latest = sessions.find((s) => s.modelId === id);
@@ -703,6 +733,7 @@ export default function App() {
       setNetBootState("needs_login");
     } else {
       void refreshContacts(s.network.server_url, s.network.token);
+      void refreshGroups(s.network.server_url, s.network.token);
       setNetBootState("logged_in");
     }
   };
@@ -713,6 +744,15 @@ export default function App() {
       setContacts(list);
     } catch (e) {
       console.warn("[network] listContacts failed:", e);
+    }
+  };
+
+  const refreshGroups = async (serverUrl: string, token: string) => {
+    try {
+      const list = await serverApi.listGroups(serverUrl, token);
+      setGroups(list);
+    } catch (e) {
+      console.warn("[network] listGroups failed:", e);
     }
   };
 
@@ -813,6 +853,7 @@ export default function App() {
         lastReadyAtRef.current = Date.now();
         if (settings.network.token) {
           void refreshContacts(settings.network.server_url, settings.network.token);
+          void refreshGroups(settings.network.server_url, settings.network.token);
           const peer = activePeerUsernameRef.current;
           if (peer) void ensurePeerHistoryLoaded(peer);
         }
@@ -830,6 +871,57 @@ export default function App() {
               : c,
           ),
         );
+        break;
+      }
+      case "contacts_changed": {
+        // Lista kontaktów się zmieniła (dodał mnie ktoś, ktoś mnie usunął,
+        // moje inne urządzenie coś zmieniło). Refresh przez REST.
+        if (settings.network.token) {
+          void refreshContacts(settings.network.server_url, settings.network.token);
+        }
+        break;
+      }
+      case "groups_changed": {
+        // Analogicznie dla grup.
+        if (settings.network.token) {
+          void refreshGroups(settings.network.server_url, settings.network.token);
+        }
+        break;
+      }
+      case "group_typing": {
+        const gid = event.group_id;
+        const who = event.from;
+        if (event.state === "start") {
+          setTypingByGroup((prev) => {
+            const cur = new Set(prev[gid] ?? []);
+            cur.add(who);
+            return { ...prev, [gid]: cur };
+          });
+          const key = `${gid}:${who}`;
+          const existing = groupTypingTimersRef.current.get(key);
+          if (existing != null) window.clearTimeout(existing);
+          const t = window.setTimeout(() => {
+            setTypingByGroup((prev) => {
+              const cur = new Set(prev[gid] ?? []);
+              cur.delete(who);
+              return { ...prev, [gid]: cur };
+            });
+            groupTypingTimersRef.current.delete(key);
+          }, 6000);
+          groupTypingTimersRef.current.set(key, t);
+        } else {
+          setTypingByGroup((prev) => {
+            const cur = new Set(prev[gid] ?? []);
+            cur.delete(who);
+            return { ...prev, [gid]: cur };
+          });
+          const key = `${gid}:${who}`;
+          const existing = groupTypingTimersRef.current.get(key);
+          if (existing != null) {
+            window.clearTimeout(existing);
+            groupTypingTimersRef.current.delete(key);
+          }
+        }
         break;
       }
       case "typing": {
@@ -928,6 +1020,75 @@ export default function App() {
             pending: false,
           };
           return { ...prev, [peer]: [...cur, msg] };
+        });
+        break;
+      }
+      case "group_message": {
+        // Nowa wiadomość w grupie. Z tym samym kontraktem co peer "message":
+        // dedup po id, increment unread gdy nie aktywna grupa, suppress
+        // sound gdy stara (z flush queue).
+        const gid = event.group_id;
+        const msg: PeerMessage = {
+          id: event.id,
+          from_me: false,
+          body: event.body,
+          created_at: event.created_at,
+          pending: false,
+          // groupSender hack: zapisujemy username nadawcy w polu które na
+          // ekranie pokażemy jako "Nick:" przed treścią.
+          groupSender: event.from,
+        };
+        const isNew = !(groupMessagesByGroup[gid] ?? []).some(
+          (m) => m.id === msg.id,
+        );
+        setGroupMessagesByGroup((prev) => {
+          const cur = prev[gid] ?? [];
+          if (cur.some((m) => m.id === msg.id)) return prev;
+          return { ...prev, [gid]: [...cur, msg] };
+        });
+        if (activeGroupIdRef.current !== gid) {
+          setUnreadByGroup((prev) => ({ ...prev, [gid]: (prev[gid] ?? 0) + 1 }));
+        }
+        const createdAtMs = new Date(event.created_at).getTime();
+        const isFromFlushQueue = createdAtMs < lastReadyAtRef.current - 1000;
+        if (isNew && !isFromFlushQueue) {
+          playNotify();
+        }
+        break;
+      }
+      case "sent_group": {
+        // Echo wysłanej wiadomości grupowej. Analog "sent" — swap tmp na
+        // server id, albo insert from-me jeśli z innego device-a.
+        const gid = event.group_id;
+        setGroupMessagesByGroup((prev) => {
+          const cur = prev[gid] ?? [];
+          const matchedLocally = !!(
+            event.client_msg_id &&
+            cur.some((m) => m.client_msg_id === event.client_msg_id)
+          );
+          if (matchedLocally) {
+            const next = cur.map((m) => {
+              if (event.client_msg_id && m.client_msg_id === event.client_msg_id) {
+                return {
+                  ...m,
+                  id: event.id,
+                  created_at: event.created_at,
+                  pending: false,
+                };
+              }
+              return m;
+            });
+            return { ...prev, [gid]: next };
+          }
+          if (cur.some((m) => m.id === event.id)) return prev;
+          const msg: PeerMessage = {
+            id: event.id,
+            from_me: true,
+            body: event.body ?? "(wiadomość z innego urządzenia)",
+            created_at: event.created_at,
+            pending: false,
+          };
+          return { ...prev, [gid]: [...cur, msg] };
         });
         break;
       }
@@ -1137,11 +1298,99 @@ export default function App() {
       setIsStreaming(false);
     }
     setActivePeerUsername(username);
+    setActiveGroupId(null);
     setUnreadByPeer((prev) => {
       if ((prev[username] ?? 0) === 0) return prev;
       return { ...prev, [username]: 0 };
     });
     void ensurePeerHistoryLoaded(username);
+  };
+
+  const ensureGroupHistoryLoaded = async (groupId: string) => {
+    if (!settings.network.token || !settings.network.account_id) return;
+    try {
+      const list = await serverApi.fetchGroupHistory(
+        settings.network.server_url,
+        settings.network.token,
+        groupId,
+        { limit: 50 },
+      );
+      const myId = settings.network.account_id;
+      const asc = [...list].reverse();
+      const decoded: PeerMessage[] = asc.map((e) => ({
+        id: e.id,
+        from_me: e.sender_id === myId,
+        body: e.body,
+        created_at: e.created_at,
+        pending: false,
+        groupSender: e.sender_username,
+      }));
+      setGroupMessagesByGroup((prev) => {
+        const curNow = prev[groupId] ?? [];
+        const curIds = new Set(curNow.map((m) => m.id));
+        const newcomers = decoded.filter((m) => !curIds.has(m.id));
+        if (newcomers.length === 0) return prev;
+        const merged = [...curNow, ...newcomers].sort((a, b) =>
+          a.created_at.localeCompare(b.created_at),
+        );
+        return { ...prev, [groupId]: merged };
+      });
+    } catch (e) {
+      console.warn("[network] group history failed:", e);
+    }
+  };
+
+  const onSelectGroup = (groupId: string) => {
+    if (isStreaming) {
+      abortRef.current?.abort();
+      setIsStreaming(false);
+    }
+    setActiveGroupId(groupId);
+    setActivePeerUsername(null);
+    setUnreadByGroup((prev) => {
+      if ((prev[groupId] ?? 0) === 0) return prev;
+      return { ...prev, [groupId]: 0 };
+    });
+    void ensureGroupHistoryLoaded(groupId);
+  };
+
+  const onGroupSend = (text: string) => {
+    const gid = activeGroupId;
+    if (!gid || !networkRef.current) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const tmpId = "tmp-" + Math.random().toString(36).slice(2, 10);
+    const msg: PeerMessage = {
+      id: tmpId,
+      client_msg_id: tmpId,
+      from_me: true,
+      body: trimmed,
+      created_at: new Date().toISOString(),
+      pending: true,
+    };
+    setGroupMessagesByGroup((prev) => {
+      const cur = prev[gid] ?? [];
+      return { ...prev, [gid]: [...cur, msg] };
+    });
+    networkRef.current.send({
+      type: "send_group_message",
+      group_id: gid,
+      body: trimmed,
+      client_msg_id: tmpId,
+    });
+  };
+
+  const onCreateGroup = async (name: string, memberUsernames: string[]) => {
+    if (!settings.network.token) return;
+    const created = await serverApi.createGroup(
+      settings.network.server_url,
+      settings.network.token,
+      name,
+      memberUsernames,
+    );
+    setGroups((prev) => [created, ...prev]);
+    setCreateGroupOpen(false);
+    onSelectGroup(created.id);
   };
 
   const onPeerSend = (text: string) => {
@@ -1205,6 +1454,10 @@ export default function App() {
     setPeerMessagesByPeer({});
     setUnreadByPeer({});
     setTypingByPeer({});
+    setGroups([]);
+    setActiveGroupId(null);
+    setGroupMessagesByGroup({});
+    setUnreadByGroup({});
     setMyDescription("");
     setMyAvatar("");
     setMyJoinedAt("");
@@ -1502,6 +1755,11 @@ export default function App() {
           onAddFriend={() => setAddFriendOpen(true)}
           onRemoveFriend={onRemoveFriend}
           unreadByPeer={unreadByPeer}
+          groups={groups}
+          activeGroupId={activeGroupId}
+          onSelectGroup={onSelectGroup}
+          onCreateGroup={() => setCreateGroupOpen(true)}
+          unreadByGroup={unreadByGroup}
           description={myDescription}
           onDescriptionChange={
             settings.network?.token ? onDescriptionChange : undefined
@@ -1516,7 +1774,45 @@ export default function App() {
           onMobileClose={() => setSidebarMobileOpen(false)}
         />
         <main className="gg-main">
-          {activePeerUsername ? (
+          {activeGroupId ? (
+            <>
+              <Conversation
+                model={{
+                  id: `group:${activeGroupId}`,
+                  name: groups.find((g) => g.id === activeGroupId)?.name ?? "Grupa",
+                  provider: "anthropic",
+                  apiModelId: "",
+                }}
+                messages={peerToChatMessages(
+                  groupMessagesByGroup[activeGroupId] ?? [],
+                  groups.find((g) => g.id === activeGroupId)?.name ?? "Grupa",
+                )}
+                sessionTitle={(() => {
+                  const typing = Array.from(typingByGroup[activeGroupId] ?? []);
+                  if (typing.length === 1) return `${typing[0]} pisze…`;
+                  if (typing.length > 1) return `${typing.length} osób pisze…`;
+                  const g = groups.find((x) => x.id === activeGroupId);
+                  return g ? `${g.member_count} osób` : "";
+                })()}
+                peerChat
+                onPeerProfileClick={() => setGroupProfileOpen(true)}
+              />
+              <Composer
+                disabled={false}
+                isStreaming={false}
+                enableEmotes
+                onSend={(text) => onGroupSend(text)}
+                onTypingChange={(typing) => {
+                  if (!activeGroupId || !networkRef.current) return;
+                  networkRef.current.send({
+                    type: "typing_group",
+                    group_id: activeGroupId,
+                    state: typing ? "start" : "stop",
+                  });
+                }}
+              />
+            </>
+          ) : activePeerUsername ? (
             <>
               <Conversation
                 model={{
@@ -1652,6 +1948,32 @@ export default function App() {
         onClose={() => setAddFriendOpen(false)}
         onAdded={onAddedFriend}
       />
+      <CreateGroupDialog
+        open={createGroupOpen}
+        contacts={contacts}
+        onClose={() => setCreateGroupOpen(false)}
+        onSubmit={onCreateGroup}
+      />
+      <GroupProfileDialog
+        open={groupProfileOpen}
+        group={
+          activeGroupId
+            ? groups.find((g) => g.id === activeGroupId) ?? null
+            : null
+        }
+        contacts={contacts}
+        serverUrl={settings.network.server_url}
+        token={settings.network.token}
+        myAccountId={settings.network.account_id ?? null}
+        onClose={() => setGroupProfileOpen(false)}
+        onLeftOrDeleted={() => {
+          setGroupProfileOpen(false);
+          setActiveGroupId(null);
+          if (settings.network.token) {
+            void refreshGroups(settings.network.server_url, settings.network.token);
+          }
+        }}
+      />
       <input
         ref={avatarFileInputRef}
         type="file"
@@ -1755,6 +2077,8 @@ interface PeerMessage {
   errored?: boolean;
   /** True gdy wiadomość przeszła przez MLS encrypt/decrypt. False/undef = legacy plain. */
   e2e?: boolean;
+  /** Tylko dla wiadomości grupowych — username nadawcy (do prefixu „Nick:"). */
+  groupSender?: string;
 }
 
 function fmtPeerTime(iso: string): string {
@@ -1769,16 +2093,22 @@ function fmtPeerTime(iso: string): string {
 /** Mapuje listę PeerMessage na format ChatMessage używany przez Conversation. */
 function peerToChatMessages(list: PeerMessage[], peerUsername: string): ChatMessage[] {
   const modelId = `peer:${peerUsername}`;
-  return list.map((m) => ({
-    id: m.id,
-    role: m.from_me ? "user" : "assistant",
-    modelId,
-    text: m.body,
-    timestamp: fmtPeerTime(m.created_at),
-    streaming: false,
-    errored: m.errored,
-    e2e: m.e2e,
-  }));
+  return list.map((m) => {
+    // Dla group messages prefix nadawcy „Nick: " do body, żeby user wiedział
+    // kto pisze (group chat ma N nadawców, nie 1 jak peer chat).
+    const text =
+      m.groupSender && !m.from_me ? `${m.groupSender}: ${m.body}` : m.body;
+    return {
+      id: m.id,
+      role: m.from_me ? "user" : "assistant",
+      modelId,
+      text,
+      timestamp: fmtPeerTime(m.created_at),
+      streaming: false,
+      errored: m.errored,
+      e2e: m.e2e,
+    };
+  });
 }
 
 function plainEntryToPeer(

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import sunIcon from "../assets/sun.svg";
 import type { SessionMeta, ToolModel } from "../types";
-import type { ServerContact } from "../lib/serverApi";
+import type { ServerContact, ServerGroup } from "../lib/serverApi";
 
 function clock(): string {
   const d = new Date();
@@ -46,6 +46,12 @@ interface Props {
   mobileOpen?: boolean;
   /** Mobile: zamknij drawer (klik w backdrop / wybór elementu z listy). */
   onMobileClose?: () => void;
+  // Grupy
+  groups?: ServerGroup[];
+  activeGroupId?: string | null;
+  onSelectGroup?: (id: string) => void;
+  onCreateGroup?: () => void;
+  unreadByGroup?: Record<string, number>;
 }
 
 export function Sidebar(props: Props) {
@@ -74,6 +80,11 @@ export function Sidebar(props: Props) {
     onChangeAvatar,
     mobileOpen,
     onMobileClose,
+    groups,
+    activeGroupId,
+    onSelectGroup,
+    onCreateGroup,
+    unreadByGroup,
   } = props;
 
   // Wrap onSelectModel/onSelectSession/onSelectPeer żeby na mobilce zamykać
@@ -104,6 +115,8 @@ export function Sidebar(props: Props) {
       .catch(() => setVersion(null));
   }, []);
   const [openFriends, setOpenFriends] = useState(true);
+  const [openGroups, setOpenGroups] = useState(true);
+  const selectGroup = onSelectGroup ? closeAfter(onSelectGroup) : undefined;
 
   const activeModel = models.find((m) => m.id === activeModelId);
   const modelSessions = sessions.filter((s) => s.modelId === activeModelId);
@@ -241,6 +254,65 @@ export function Sidebar(props: Props) {
                 >
                   <span className="gg-glyph gg-glyph--close" />
                 </button>
+              </div>
+            );
+          })}
+        </Section>
+      )}
+
+      {networkLoggedIn && (
+        <Section
+          title="Grupy"
+          count={groups && groups.length > 0 ? `(${groups.length})` : undefined}
+          open={openGroups}
+          onToggle={() => setOpenGroups((v) => !v)}
+          action={
+            onCreateGroup ? (
+              <button
+                type="button"
+                className="gg-section-action"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateGroup();
+                }}
+                title="Utwórz nową grupę"
+              >
+                + Nowa
+              </button>
+            ) : null
+          }
+        >
+          {(!groups || groups.length === 0) && (
+            <div className="gg-history-empty">
+              Brak grup. Kliknij „+ Nowa" żeby założyć pierwszą.
+            </div>
+          )}
+          {groups?.map((g) => {
+            const unread = unreadByGroup?.[g.id] ?? 0;
+            return (
+              <div
+                key={g.id}
+                className={`gg-friend-item${activeGroupId === g.id ? " is-active" : ""}`}
+                onClick={() => selectGroup?.(g.id)}
+                title={`${g.member_count} członków`}
+              >
+                <span className="gg-friend-dot-wrap" aria-hidden>
+                  <span className="gg-friend-dot gg-friend-dot--group" />
+                  {unread > 0 && (
+                    <span className="gg-friend-dot gg-friend-dot--unread gg-friend-dot--blink" />
+                  )}
+                </span>
+                <div className="gg-friend-text">
+                  <div className="gg-friend-row">
+                    <span className="gg-friend-name">{g.name}</span>
+                    {unread > 0 && (
+                      <span className="gg-friend-unread" title={`${unread} nieprzeczytanych`}>
+                        {unread > 99 ? "99+" : unread}
+                      </span>
+                    )}
+                  </div>
+                  <div className="gg-friend-desc">{g.member_count} osób</div>
+                </div>
               </div>
             );
           })}

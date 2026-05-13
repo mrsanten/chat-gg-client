@@ -31,7 +31,14 @@ export type ClientEvent =
     }
   | { type: "send_welcome"; to: string; ciphertext: string }
   | { type: "ping" }
-  | { type: "set_status"; status: "online" | "afk" };
+  | { type: "set_status"; status: "online" | "afk" }
+  | {
+      type: "send_group_message";
+      group_id: string;
+      body: string;
+      client_msg_id?: string;
+    }
+  | { type: "typing_group"; group_id: string; state: TypingState };
 
 export type ServerEvent =
   | { type: "ready"; account_id: string; username: string }
@@ -84,6 +91,30 @@ export type ServerEvent =
       from: string;
       ciphertext: string;
       created_at: string;
+    }
+  | {
+      type: "group_message";
+      id: string;
+      group_id: string;
+      from: string;
+      body: string;
+      created_at: string;
+    }
+  | {
+      type: "sent_group";
+      id: string;
+      group_id: string;
+      client_msg_id: string | null;
+      body: string;
+      created_at: string;
+    }
+  | { type: "contacts_changed" }
+  | { type: "groups_changed" }
+  | {
+      type: "group_typing";
+      group_id: string;
+      from: string;
+      state: TypingState;
     }
   | { type: "pong" }
   | { type: "error"; code: string; message: string };

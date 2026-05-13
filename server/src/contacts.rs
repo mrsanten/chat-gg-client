@@ -1,7 +1,7 @@
 use crate::auth::AuthUser;
 use crate::error::{AppError, AppResult};
 use crate::state::AppState;
-use crate::ws::{derive_presence, PresenceStatus};
+use crate::ws::{derive_presence, PresenceStatus, ServerEvent};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -111,6 +111,10 @@ pub async fn add_contact(
         description: peer.2,
         avatar: peer.3,
     };
+    // Powiadom oba konta (owner inne devices + peer wszystkie devices).
+    // Klient po odebraniu refreshuje GET /contacts żeby zobaczyć nowy wpis.
+    state.hub.send_to(user.account_id, ServerEvent::ContactsChanged).await;
+    state.hub.send_to(view.peer_id, ServerEvent::ContactsChanged).await;
     Ok((StatusCode::CREATED, Json(view)))
 }
 
@@ -167,5 +171,7 @@ pub async fn remove_contact(
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
+    state.hub.send_to(user.account_id, ServerEvent::ContactsChanged).await;
+    state.hub.send_to(peer_id, ServerEvent::ContactsChanged).await;
     Ok(StatusCode::NO_CONTENT)
 }

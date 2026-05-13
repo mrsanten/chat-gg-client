@@ -3,6 +3,7 @@ mod config;
 mod contacts;
 mod devices;
 mod error;
+mod groups;
 mod history;
 mod hub;
 mod key_packages;
@@ -60,6 +61,20 @@ async fn main() -> anyhow::Result<()> {
             get(contacts::list_contacts).post(contacts::add_contact),
         )
         .route("/contacts/{peer_id}", axum::routing::delete(contacts::remove_contact))
+        .route("/groups", get(groups::list_groups).post(groups::create_group))
+        .route(
+            "/groups/{id}",
+            axum::routing::patch(groups::update_group).delete(groups::delete_group),
+        )
+        .route(
+            "/groups/{id}/members",
+            get(groups::list_members).post(groups::add_member),
+        )
+        .route(
+            "/groups/{id}/members/{user_id}",
+            axum::routing::delete(groups::remove_member),
+        )
+        .route("/groups/{id}/history", get(groups::group_history))
         .route("/history", get(history::history))
         .route("/key-packages", post(key_packages::publish))
         .route("/key-packages/_count", get(key_packages::my_count))
