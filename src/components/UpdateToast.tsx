@@ -29,7 +29,7 @@ export function UpdateToast({ pending, status, onInstall, onDismiss }: Props) {
     <div className="gg-update-toast" role="status" aria-live="polite">
       <div className="gg-update-toast-header">
         <img src={sunIcon} alt="" className="gg-update-toast-icon" />
-        <span className="gg-update-toast-title">Nowa wersja GAIdu GAIdu</span>
+        <span className="gg-update-toast-title">Nowa wersja Gaidu</span>
         {!busy && (
           <button
             type="button"

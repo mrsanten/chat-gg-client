@@ -126,7 +126,7 @@ export function NetworkAccountDialog({
             <>
               {forced && (
                 <p className="gg-hint">
-                  Zaloguj się do sieci GAIdu, żeby korzystać z apki. Hasło zostanie
+                  Zaloguj się do sieci Gaidu, żeby korzystać z apki. Hasło zostanie
                   zapamiętane lokalnie — przy następnym uruchomieniu połączymy się
                   automatycznie.
                 </p>
@@ -262,7 +262,7 @@ function NetworkStatusPanel({ username, wsStatus, netStats }: StatusPanelProps) 
           Zalogowany jako <strong>{username}</strong>
         </p>
         <p className="gg-hint">
-          Wylogowanie znajdziesz w menu „GAIdu GAIdu" w pasku górnym.
+          Wylogowanie znajdziesz w menu „Gaidu" w pasku górnym.
         </p>
       </fieldset>
 

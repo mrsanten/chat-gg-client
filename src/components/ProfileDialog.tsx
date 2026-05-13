@@ -54,7 +54,7 @@ export function ProfileDialog({ open, initialNick = "", required, onSave, onCanc
         <div className="gg-modal-titlebar">
           <img src={sunIcon} alt="" className="gg-chatwin-titlebar-icon" />
           <span className="gg-chatwin-titlebar-text">
-            {required ? "Witaj w GAIdu GAIdu" : "Twój profil"}
+            {required ? "Witaj w Gaidu" : "Twój profil"}
           </span>
           {!required && (
             <div className="gg-chatwin-titlebar-buttons">

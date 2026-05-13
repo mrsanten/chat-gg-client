@@ -1,3 +1,4 @@
+mod ai_sessions;
 mod auth;
 mod config;
 mod contacts;
@@ -8,6 +9,7 @@ mod history;
 mod hub;
 mod key_packages;
 mod push;
+mod secrets;
 mod state;
 mod ws;
 
@@ -75,6 +77,17 @@ async fn main() -> anyhow::Result<()> {
             axum::routing::delete(groups::remove_member),
         )
         .route("/groups/{id}/history", get(groups::group_history))
+        .route("/me/secrets", get(secrets::list_secrets))
+        .route(
+            "/me/secrets/{provider}",
+            axum::routing::put(secrets::upsert_secret),
+        )
+        .route("/me/sessions", get(ai_sessions::list_sessions))
+        .route(
+            "/me/sessions/{id}",
+            axum::routing::put(ai_sessions::upsert_session)
+                .delete(ai_sessions::delete_session),
+        )
         .route("/history", get(history::history))
         .route("/key-packages", post(key_packages::publish))
         .route("/key-packages/_count", get(key_packages::my_count))

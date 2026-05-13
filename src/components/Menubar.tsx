@@ -44,7 +44,7 @@ export function Menubar({
         onClick={() => setOpenMenu((v) => (v === "main" ? null : "main"))}
       >
         <span>
-          <u>G</u>AIdu GAIdu
+          <u>G</u>aidu
         </span>
         {openMenu === "main" && (
           <div className="gg-menu-dropdown" onMouseDown={(e) => e.stopPropagation()}>

@@ -266,6 +266,78 @@ export async function removeContact(
   });
 }
 
+// ─────────────────────────────────── API keys per-account (sync across devices)
+
+export interface ServerApiKey {
+  provider: "openai" | "anthropic" | "moonshot";
+  api_key: string;
+}
+
+export async function listSecrets(
+  serverUrl: string,
+  token: string,
+): Promise<ServerApiKey[]> {
+  return request<ServerApiKey[]>("GET", serverUrl, "/me/secrets", { token });
+}
+
+export async function updateSecret(
+  serverUrl: string,
+  token: string,
+  provider: "openai" | "anthropic" | "moonshot",
+  apiKey: string,
+): Promise<void> {
+  await request<void>(
+    "PUT",
+    serverUrl,
+    `/me/secrets/${encodeURIComponent(provider)}`,
+    { token, body: { api_key: apiKey } },
+  );
+}
+
+// ─────────────────────────────────── AI sessions (server-side storage)
+
+export interface ServerAiSession {
+  id: string;
+  model_id: string;
+  title: string;
+  messages: unknown[]; // ChatMessage[] po stronie klienta
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listAiSessions(
+  serverUrl: string,
+  token: string,
+): Promise<ServerAiSession[]> {
+  return request<ServerAiSession[]>("GET", serverUrl, "/me/sessions", { token });
+}
+
+export async function upsertAiSession(
+  serverUrl: string,
+  token: string,
+  session: ServerAiSession,
+): Promise<void> {
+  await request<void>(
+    "PUT",
+    serverUrl,
+    `/me/sessions/${encodeURIComponent(session.id)}`,
+    { token, body: session },
+  );
+}
+
+export async function deleteAiSession(
+  serverUrl: string,
+  token: string,
+  id: string,
+): Promise<void> {
+  await request<void>(
+    "DELETE",
+    serverUrl,
+    `/me/sessions/${encodeURIComponent(id)}`,
+    { token },
+  );
+}
+
 // ─────────────────────────────────── Groups
 
 export interface ServerGroup {

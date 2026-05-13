@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import sunIcon from "../assets/sun.svg";
 import type { SessionMeta, ToolModel } from "../types";
@@ -118,8 +118,8 @@ export function Sidebar(props: Props) {
   const [openGroups, setOpenGroups] = useState(true);
   const selectGroup = onSelectGroup ? closeAfter(onSelectGroup) : undefined;
 
-  const activeModel = models.find((m) => m.id === activeModelId);
-  const modelSessions = sessions.filter((s) => s.modelId === activeModelId);
+  // (Wcześniej filtrowane per-model; teraz Historia pokazuje wszystkie sesje,
+  // każda z badge-em modelu. Usunięte `activeModel` i `modelSessions`.)
 
   return (
     <>
@@ -324,54 +324,50 @@ export function Sidebar(props: Props) {
         open={openTools}
         onToggle={() => setOpenTools((v) => !v)}
       >
-        {models.map((m) => {
-          const ok = configuredByModel[m.id] === true;
-          return (
-            <div
-              key={m.id}
-              className={`gg-tool-item${m.id === activeModelId && !activePeerUsername ? " is-active" : ""}`}
-              onClick={() => selectModel(m.id)}
-            >
-              <span
-                className={`gg-tool-item-status ${ok ? "gg-tool-item-status--on" : "gg-tool-item-status--off"}`}
-                title={ok ? "Skonfigurowane" : "Brak konfiguracji - otwórz Ustawienia"}
-                aria-hidden
-              />
-              <span className="gg-tool-item-name">{m.name}</span>
-            </div>
-          );
-        })}
+        {/* Pojedyncza pozycja "AI Chat" zamiast listy per-model. Wybór modelu
+           dla nowej rozmowy przez dropdown przy "+ Nowy" w sekcji Historia. */}
+        <div
+          className={`gg-tool-item${!activePeerUsername && !activeGroupId ? " is-active" : ""}`}
+          onClick={() => selectModel(activeModelId)}
+        >
+          <span
+            className="gg-tool-item-status gg-tool-item-status--on"
+            aria-hidden
+          />
+          <span className="gg-tool-item-name">AI Chat</span>
+        </div>
       </Section>
 
+      {!activePeerUsername && !activeGroupId && (
       <Section
-        title={`Historia${activeModel ? ` ${activeModel.name}` : ""}`}
+        title="Historia"
         open={openHistory}
         onToggle={() => setOpenHistory((v) => !v)}
         scroll
         action={
-          <button
-            type="button"
-            className="gg-section-action"
-            onClick={(e) => {
-              e.stopPropagation();
+          <NewSessionMenu
+            models={models}
+            configuredByModel={configuredByModel}
+            onPick={(modelId) => {
+              onSelectModel(modelId);
               onNewSession();
             }}
-            title="Nowa rozmowa"
-          >
-            + Nowy
-          </button>
+          />
         }
       >
-        {modelSessions.length === 0 && (
+        {sessions.length === 0 && (
           <div className="gg-history-empty">Brak rozmów. Napisz wiadomość żeby zacząć.</div>
         )}
-        {modelSessions.map((s) => (
+        {sessions.map((s) => {
+          const modelName = models.find((m) => m.id === s.modelId)?.name ?? s.modelId;
+          return (
           <div
             key={s.id}
-            className={`gg-session-item${s.id === activeSessionId && !activePeerUsername ? " is-active" : ""}`}
+            className={`gg-session-item${s.id === activeSessionId && !activePeerUsername && !activeGroupId ? " is-active" : ""}`}
             onClick={() => selectSession(s.id)}
           >
             <span className="gg-session-title">{s.title}</span>
+            <span className="gg-session-model-badge" title={modelName}>{modelName}</span>
             <span className="gg-session-time">{formatRel(s.updatedAt)}</span>
             <button
               type="button"
@@ -386,8 +382,10 @@ export function Sidebar(props: Props) {
               <span className="gg-glyph gg-glyph--close" />
             </button>
           </div>
-        ))}
+          );
+        })}
       </Section>
+      )}
 
       <div className="gg-sidebar-footer">
         <a className="gg-sidebar-ad" href="#" onClick={(e) => e.preventDefault()}>
@@ -415,6 +413,65 @@ interface SectionProps {
   scroll?: boolean;
   action?: React.ReactNode;
   children?: React.ReactNode;
+}
+
+function NewSessionMenu({
+  models,
+  configuredByModel,
+  onPick,
+}: {
+  models: ToolModel[];
+  configuredByModel: Record<string, boolean>;
+  onPick: (modelId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [open]);
+  return (
+    <div className="gg-newsession" ref={ref}>
+      <button
+        type="button"
+        className="gg-section-action"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        title="Nowa rozmowa"
+      >
+        + Nowy
+      </button>
+      {open && (
+        <div className="gg-newsession-menu" onClick={(e) => e.stopPropagation()}>
+          {models.map((m) => {
+            const ok = configuredByModel[m.id] === true;
+            return (
+              <button
+                key={m.id}
+                type="button"
+                className="gg-newsession-item"
+                onClick={() => {
+                  setOpen(false);
+                  onPick(m.id);
+                }}
+                disabled={!ok}
+                title={ok ? m.name : `${m.name} — wymaga konfiguracji`}
+              >
+                <span>{m.name}</span>
+                {!ok && <span className="gg-newsession-item-meta">brak konfiguracji</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Section({ title, count, open, onToggle, scroll, action, children }: SectionProps) {

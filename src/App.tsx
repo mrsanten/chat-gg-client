@@ -42,6 +42,7 @@ import {
   type PendingUpdate,
 } from "./lib/updater";
 import {
+  clearSessionCache,
   deleteSession as deleteSessionRpc,
   deriveTitle,
   listSessions,
@@ -215,9 +216,11 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      const [s, sess] = await Promise.all([loadSettings(), listSessions()]);
+      // listSessions wymaga tokenu (REST), więc na boot zaczynamy od pustej
+      // listy i refreshujemy w tryRestore po zweryfikowaniu auth.
+      const s = await loadSettings();
       setSettings(s);
-      setSessions(sess);
+      setSessions([]);
       // Walidacja JWT przy starcie. Jeśli nieważny → wyczyść z settings,
       // żeby przy następnym otwarciu NetworkAccountDialog user widział
       // formularz logowania zamiast „już zalogowany".
@@ -225,6 +228,8 @@ export default function App() {
         const tryRestore = async (currentSettings: typeof s, accountId: string) => {
           void refreshContacts(currentSettings.network.server_url, currentSettings.network.token);
           void refreshGroups(currentSettings.network.server_url, currentSettings.network.token);
+          void refreshSessions(currentSettings.network.server_url, currentSettings.network.token);
+          void refreshSecrets(currentSettings.network.server_url, currentSettings.network.token);
           try {
             const raw = localStorage.getItem(`peer-msgs:${accountId}`);
             if (raw) {
@@ -658,7 +663,11 @@ export default function App() {
   const switchActiveSession = async (modelId: string, sessionId: string | null) => {
     setActiveSessionByModel((prev) => ({ ...prev, [modelId]: sessionId }));
     if (sessionId && !messagesBySession[sessionId]) {
-      const session = await loadSessionRpc(sessionId);
+      const session = await loadSessionRpc(
+        sessionId,
+        settings.network.server_url,
+        settings.network.token,
+      );
       if (session) {
         setMessagesBySession((prev) => ({
           ...prev,
@@ -703,7 +712,7 @@ export default function App() {
   };
 
   const onDeleteSession = async (id: string) => {
-    await deleteSessionRpc(id);
+    await deleteSessionRpc(id, settings.network.server_url, settings.network.token);
     setSessions((prev) => prev.filter((s) => s.id !== id));
     setMessagesBySession((prev) => {
       const next = { ...prev };
@@ -734,6 +743,8 @@ export default function App() {
     } else {
       void refreshContacts(s.network.server_url, s.network.token);
       void refreshGroups(s.network.server_url, s.network.token);
+      // Push API keys do servera — wszystkie providery (PUT z pustym body = clear).
+      void pushSecrets(s.network.server_url, s.network.token, s);
       setNetBootState("logged_in");
     }
   };
@@ -754,6 +765,73 @@ export default function App() {
     } catch (e) {
       console.warn("[network] listGroups failed:", e);
     }
+  };
+
+  const refreshSessions = async (serverUrl: string, token: string) => {
+    try {
+      const list = await listSessions(serverUrl, token);
+      setSessions(list);
+    } catch (e) {
+      console.warn("[network] listSessions failed:", e);
+    }
+  };
+
+  const refreshSecrets = async (serverUrl: string, token: string) => {
+    try {
+      const rows = await serverApi.listSecrets(serverUrl, token);
+      if (rows.length === 0) return;
+      // Merge: server source-of-truth dla każdego providera którego MA. Jeśli
+      // lokalnie był klucz a server nie ma, zostawiamy lokalny (push przy
+      // następnym save). saveSettings persistuje na dysku.
+      setSettings((cur) => {
+        const next: Settings = JSON.parse(JSON.stringify(cur));
+        for (const row of rows) {
+          if (row.provider === "openai") {
+            next.openai.auth = { mode: "api_key", api_key: row.api_key };
+          } else if (row.provider === "anthropic") {
+            next.anthropic.auth = { mode: "api_key", api_key: row.api_key };
+          } else if (row.provider === "moonshot") {
+            const baseUrl =
+              cur.moonshot.auth.mode === "api_key"
+                ? cur.moonshot.auth.base_url
+                : null;
+            next.moonshot.auth = {
+              mode: "api_key",
+              api_key: row.api_key,
+              base_url: baseUrl,
+            };
+          }
+        }
+        void import("./lib/settings").then((m) => m.saveSettings(next));
+        return next;
+      });
+    } catch (e) {
+      console.warn("[network] listSecrets failed:", e);
+    }
+  };
+
+  const pushSecrets = async (
+    serverUrl: string,
+    token: string,
+    s: Settings,
+  ) => {
+    const pushOne = async (
+      provider: "openai" | "anthropic" | "moonshot",
+      key: string | undefined,
+    ) => {
+      try {
+        await serverApi.updateSecret(serverUrl, token, provider, key ?? "");
+      } catch (e) {
+        console.warn(`[network] updateSecret ${provider}:`, e);
+      }
+    };
+    const extract = (auth: { mode: string; api_key?: string }): string | undefined =>
+      auth.mode === "api_key" ? auth.api_key : undefined;
+    await Promise.all([
+      pushOne("openai", extract(s.openai.auth as { mode: string; api_key?: string })),
+      pushOne("anthropic", extract(s.anthropic.auth as { mode: string; api_key?: string })),
+      pushOne("moonshot", extract(s.moonshot.auth as { mode: string; api_key?: string })),
+    ]);
   };
 
   /**
@@ -854,6 +932,7 @@ export default function App() {
         if (settings.network.token) {
           void refreshContacts(settings.network.server_url, settings.network.token);
           void refreshGroups(settings.network.server_url, settings.network.token);
+          void refreshSessions(settings.network.server_url, settings.network.token);
           const peer = activePeerUsernameRef.current;
           if (peer) void ensurePeerHistoryLoaded(peer);
         }
@@ -1458,6 +1537,10 @@ export default function App() {
     setActiveGroupId(null);
     setGroupMessagesByGroup({});
     setUnreadByGroup({});
+    setSessions([]);
+    setMessagesBySession({});
+    setActiveSessionByModel({});
+    clearSessionCache();
     setMyDescription("");
     setMyAvatar("");
     setMyJoinedAt("");
@@ -1675,7 +1758,11 @@ export default function App() {
         messages: messagesToStored(finalMessages),
       };
       try {
-        await saveSessionRpc(session);
+        await saveSessionRpc(
+          session,
+          settings.network.server_url,
+          settings.network.token,
+        );
         setSessions((prev) => {
           const without = prev.filter((s) => s.id !== sid);
           return [
@@ -1698,7 +1785,7 @@ export default function App() {
 
   return (
     <div className="gg-window">
-      <Titlebar title="GAIdu GAIdu 10" />
+      <Titlebar title="Gaidu" />
       <Menubar
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenChangelog={() => setChangelogOpen(true)}
@@ -1937,7 +2024,7 @@ export default function App() {
       />
       {netBootState === "server_unreachable" && (
         <div className="gg-net-offline-banner" role="status">
-          Sieć GAIdu chwilowo niedostępna. Możesz korzystać z chatów AI;
+          Sieć Gaidu chwilowo niedostępna. Możesz korzystać z chatów AI;
           rozmowy ze znajomymi wrócą gdy serwer się odezwie.
         </div>
       )}

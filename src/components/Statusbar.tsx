@@ -30,11 +30,11 @@ export function Statusbar({ net = "logged_out" }: Props) {
 
   const netLabel =
     net === "connected"
-      ? "Połączony z siecią GG"
+      ? "Połączony z siecią Gaidu"
       : net === "connecting"
-        ? "Łączenie z siecią GG…"
+        ? "Łączenie z siecią Gaidu…"
         : net === "disconnected"
-          ? "Brak połączenia z siecią GG"
+          ? "Brak połączenia z siecią Gaidu"
           : "Niezalogowany";
 
   // Sygnał (4 paski) zaplaszający się w zależności od stanu.

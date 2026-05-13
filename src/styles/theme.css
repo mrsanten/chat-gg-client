@@ -2691,3 +2691,63 @@ input, textarea {
 [data-theme="dark"] .gg-creategroup-row:hover {
   background: #2c3a55;
 }
+
+/* Sesja w historii — badge z nazwą modelu obok tytułu. */
+.gg-session-model-badge {
+  font-size: 9px;
+  color: var(--text-mute);
+  background: var(--xp-face-line);
+  padding: 1px 5px;
+  border-radius: 8px;
+  margin: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+.gg-session-item.is-active .gg-session-model-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* "+ Nowy" w History — przycisk z dropdownem do wyboru modelu. */
+.gg-newsession {
+  position: relative;
+}
+.gg-newsession-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  min-width: 180px;
+  background: var(--xp-face);
+  border: 1px solid var(--xp-face-line);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+.gg-newsession-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  color: var(--text);
+}
+.gg-newsession-item:hover:not(:disabled) {
+  background: var(--xp-blue-1);
+  color: #fff;
+}
+.gg-newsession-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.gg-newsession-item-meta {
+  font-size: 10px;
+  color: var(--text-mute);
+  margin-left: 8px;
+}
