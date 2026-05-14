@@ -164,6 +164,39 @@ async fn run_openai_compat(
     history: Vec<ChatMessageDto>,
     channel: Channel<StreamEvent>,
 ) -> anyhow::Result<()> {
+    // Próbujemy najpierw stream. Jeśli reqwest wywali decode error w trakcie
+    // (Moonshot/upstream rwie połączenie albo gzipuje a my nie umiemy),
+    // fallback na non-streaming (`stream: false`) który zwraca cały response
+    // w jednym JSON-ie i kompozer rendеruje w kawałku.
+    match run_openai_compat_stream(label, base_url, api_key, model, history.clone(), &channel).await {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let msg = format!("{e}");
+            // Reqwest decode/stream error → spróbuj non-streaming
+            if msg.contains("decoding response body")
+                || msg.contains("error decoding")
+                || msg.contains("stream")
+            {
+                eprintln!(
+                    "[chat] {} streaming failed ({}); fallback do non-streaming",
+                    label, msg
+                );
+                run_openai_compat_full(label, base_url, api_key, model, history, &channel).await
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
+
+async fn run_openai_compat_stream(
+    label: &str,
+    base_url: &str,
+    api_key: &str,
+    model: &str,
+    history: Vec<ChatMessageDto>,
+    channel: &Channel<StreamEvent>,
+) -> anyhow::Result<()> {
     let mut messages: Vec<serde_json::Value> = vec![json!({
         "role": "system",
         "content": SYSTEM_PROMPT,
@@ -186,7 +219,8 @@ async fn run_openai_compat(
         .header("content-type", "application/json")
         .json(&body)
         .send()
-        .await?;
+        .await
+        .map_err(|e| anyhow::anyhow!("{} API request failed: {e}", label))?;
 
     if !resp.status().is_success() {
         let status = resp.status();
@@ -198,7 +232,8 @@ async fn run_openai_compat(
     let mut buf = String::new();
 
     while let Some(chunk) = stream.next().await {
-        let bytes = chunk?;
+        let bytes = chunk
+            .map_err(|e| anyhow::anyhow!("{} API stream error (decoding response body): {e}", label))?;
         buf.push_str(&String::from_utf8_lossy(&bytes));
         loop {
             let Some(idx) = buf.find("\n\n") else { break };
@@ -228,6 +263,67 @@ async fn run_openai_compat(
         }
     }
 
+    Ok(())
+}
+
+/// Non-streaming fallback — pobiera cały response naraz w JSON-ie.
+async fn run_openai_compat_full(
+    label: &str,
+    base_url: &str,
+    api_key: &str,
+    model: &str,
+    history: Vec<ChatMessageDto>,
+    channel: &Channel<StreamEvent>,
+) -> anyhow::Result<()> {
+    let mut messages: Vec<serde_json::Value> = vec![json!({
+        "role": "system",
+        "content": SYSTEM_PROMPT,
+    })];
+    messages.extend(history.iter().map(|m| json!({
+        "role": m.role,
+        "content": openai_content(m),
+    })));
+    let body = json!({
+        "model": model,
+        "stream": false,
+        "messages": messages,
+    });
+
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(&url)
+        .header("authorization", format!("Bearer {}", api_key))
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!("{} API request failed: {e}", label))?;
+
+    let status = resp.status();
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| anyhow::anyhow!("{} API body read failed: {e}", label))?;
+    if !status.is_success() {
+        anyhow::bail!("{} API {}: {}", label, status, text);
+    }
+
+    let v: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| anyhow::anyhow!("{} API non-JSON response: {e}", label))?;
+    let content = v
+        .get("choices")
+        .and_then(|c| c.get(0))
+        .and_then(|c| c.get("message"))
+        .and_then(|m| m.get("content"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("");
+
+    if !content.is_empty() {
+        let _ = channel.send(StreamEvent::Delta {
+            text: content.to_string(),
+        });
+    }
     Ok(())
 }
 
