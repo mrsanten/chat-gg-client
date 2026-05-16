@@ -4,11 +4,6 @@ import sunIcon from "../assets/sun.svg";
 import type { SessionMeta, ToolModel } from "../types";
 import type { ServerContact, ServerGroup } from "../lib/serverApi";
 
-function clock(): string {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
 interface Props {
   models: ToolModel[];
   activeModelId: string;
@@ -35,14 +30,10 @@ interface Props {
   onRemoveFriend?: (contact: ServerContact) => void;
   /** Mapa username -> liczba nieprzeczytanych. Reset gdy wybierzesz peera. */
   unreadByPeer?: Record<string, number>;
-  /** Opis z profilu zalogowanego usera (z serwera). Editowalny przez input. */
-  description?: string;
-  /** Wywoływane gdy user zmieni description; rodzic powinien debounce-ować save. */
-  onDescriptionChange?: (description: string) => void;
   /** Aktualny avatar usera (data URL). Pusty/undefined → fallback na sun.svg. */
   avatar?: string;
-  /** Klik w ramkę avatara wywołuje to (rodzic odpala file picker, kompresuje, zapisuje). */
-  onChangeAvatar?: () => void;
+  /** Klik w panel użytkownika (na dole sidebaru) otwiera dialog profilu. */
+  onOpenProfile?: () => void;
   /** Mobile drawer: true → sidebar wsunięty, false → schowany za viewport. */
   mobileOpen?: boolean;
   /** Mobile: zamknij drawer (klik w backdrop / wybór elementu z listy). */
@@ -75,10 +66,8 @@ export function Sidebar(props: Props) {
     onAddFriend,
     onRemoveFriend,
     unreadByPeer,
-    description,
-    onDescriptionChange,
     avatar,
-    onChangeAvatar,
+    onOpenProfile,
     mobileOpen,
     onMobileClose,
     groups,
@@ -102,14 +91,8 @@ export function Sidebar(props: Props) {
 
   const [openTools, setOpenTools] = useState(true);
   const [openHistory, setOpenHistory] = useState(true);
-  // Mobile-only: w sidebar footer pokazujemy zegar + wersję (statusbar
-  // ukryty na mobile). Update co 30s wystarczy — zegar nie musi tickować.
-  const [time, setTime] = useState(clock());
+  // Wersja apki — pokazywana w panelu użytkownika na dole sidebaru.
   const [version, setVersion] = useState<string | null>(null);
-  useEffect(() => {
-    const t = window.setInterval(() => setTime(clock()), 30_000);
-    return () => window.clearInterval(t);
-  }, []);
   useEffect(() => {
     getVersion()
       .then(setVersion)
@@ -128,52 +111,7 @@ export function Sidebar(props: Props) {
         <div className="gg-sidebar-backdrop" onClick={onMobileClose} aria-hidden />
       )}
       <aside className={`gg-sidebar${mobileOpen ? " is-mobile-open" : ""}`}>
-      <div className="gg-profile">
-        <div className="gg-profile-avatar">
-          <div
-            className={`gg-profile-avatar-frame${onChangeAvatar ? " is-clickable" : ""}`}
-            onClick={onChangeAvatar}
-            role={onChangeAvatar ? "button" : undefined}
-            title={onChangeAvatar ? "Zmień avatar" : undefined}
-            tabIndex={onChangeAvatar ? 0 : undefined}
-          >
-            {avatar && avatar.length > 0 ? (
-              <img src={avatar} alt="" className="gg-profile-avatar-photo" />
-            ) : (
-              <img src={sunIcon} alt="" className="gg-profile-avatar-fallback" />
-            )}
-            {onChangeAvatar && (
-              <span className="gg-profile-avatar-edit" aria-hidden>
-                ✎
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="gg-profile-info">
-          <div className="gg-profile-name">
-            {nick && nick.trim().length > 0 ? nick : "Użytkownik"}
-          </div>
-          <div className={`gg-profile-status gg-profile-status--${presence ?? "logged_out"}`}>
-            {presence === "online"
-              ? "Dostępny"
-              : presence === "afk"
-                ? "Zaraz wracam"
-                : presence === "connecting"
-                  ? "Łączenie…"
-                  : presence === "offline"
-                    ? "Brak połączenia"
-                    : "Niezalogowany"}
-          </div>
-          <input
-            className="gg-profile-desc"
-            placeholder="Wpisz opis..."
-            value={description ?? ""}
-            maxLength={200}
-            onChange={(e) => onDescriptionChange?.(e.target.value)}
-            disabled={!onDescriptionChange}
-          />
-        </div>
-      </div>
+      <div className="gg-sidebar-scroll">
 
       {networkLoggedIn && (
         <Section
@@ -344,7 +282,6 @@ export function Sidebar(props: Props) {
         title="Historia"
         open={openHistory}
         onToggle={() => setOpenHistory((v) => !v)}
-        scroll
         action={
           <NewSessionMenu
             models={models}
@@ -388,19 +325,52 @@ export function Sidebar(props: Props) {
       </Section>
       )}
 
-      <div className="gg-sidebar-footer">
-        <a className="gg-sidebar-ad" href="#" onClick={(e) => e.preventDefault()}>
-          <span className="gg-sidebar-ad-label">Reklama</span>
-          <div className="gg-sidebar-ad-row">
-            <img className="gg-sidebar-ad-img" src="/larry.webp" alt="Larry" />
-            <span className="gg-sidebar-ad-text">A czy ty zjadłeś japuszko? Larry patrzy!</span>
-          </div>
-        </a>
-        <div className="gg-sidebar-mobile-status" aria-hidden>
-          <span>{time}</span>
-          {version && <span>v{version}</span>}
+      <a className="gg-sidebar-ad" href="#" onClick={(e) => e.preventDefault()}>
+        <span className="gg-sidebar-ad-label">Reklama</span>
+        <div className="gg-sidebar-ad-row">
+          <img className="gg-sidebar-ad-img" src="/larry.webp" alt="Larry" />
+          <span className="gg-sidebar-ad-text">A czy ty zjadłeś japuszko? Larry patrzy!</span>
         </div>
+      </a>
+
       </div>
+
+      <button
+        type="button"
+        className="gg-userpanel"
+        onClick={onOpenProfile}
+        disabled={!onOpenProfile}
+        title={onOpenProfile ? "Pokaż profil" : undefined}
+      >
+        <span className="gg-userpanel-avatar">
+          {avatar && avatar.length > 0 ? (
+            <img src={avatar} alt="" className="gg-userpanel-photo" />
+          ) : (
+            <img src={sunIcon} alt="" className="gg-userpanel-fallback" />
+          )}
+          <span
+            className={`gg-userpanel-dot gg-userpanel-dot--${presence ?? "logged_out"}`}
+            aria-hidden
+          />
+        </span>
+        <span className="gg-userpanel-text">
+          <span className="gg-userpanel-name">
+            {nick && nick.trim().length > 0 ? nick : "Użytkownik"}
+          </span>
+          <span className={`gg-userpanel-status gg-userpanel-status--${presence ?? "logged_out"}`}>
+            {presence === "online"
+              ? "Dostępny"
+              : presence === "afk"
+                ? "Zaraz wracam"
+                : presence === "connecting"
+                  ? "Łączenie…"
+                  : presence === "offline"
+                    ? "Brak połączenia"
+                    : "Niezalogowany"}
+          </span>
+        </span>
+        {version && <span className="gg-userpanel-ver">v{version}</span>}
+      </button>
       </aside>
     </>
   );

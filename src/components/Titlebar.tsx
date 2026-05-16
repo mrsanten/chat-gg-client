@@ -1,12 +1,10 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import sunIcon from "../assets/sun.svg";
 
 export function Titlebar({ title }: { title: string }) {
   const win = getCurrentWindow();
 
   return (
     <div className="gg-titlebar" data-tauri-drag-region>
-      <img src={sunIcon} alt="" className="gg-titlebar-icon" data-tauri-drag-region />
       <span className="gg-titlebar-text" data-tauri-drag-region>{title}</span>
       <div className="gg-titlebar-buttons">
         <button

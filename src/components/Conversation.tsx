@@ -49,37 +49,39 @@ export function Conversation({
     : null;
   const showUnreadBlink = !!peerPresence && (peerUnread ?? 0) > 0;
 
+  const headerClickable = !!(peerPresence && onPeerProfileClick);
+
   return (
-    <div className="gg-chatwin">
-      <div
-        className={`gg-chatwin-titlebar${
-          peerPresence && onPeerProfileClick ? " is-clickable" : ""
-        }`}
-        onClick={peerPresence && onPeerProfileClick ? onPeerProfileClick : undefined}
-        role={peerPresence && onPeerProfileClick ? "button" : undefined}
-        title={peerPresence && onPeerProfileClick ? "Pokaż profil" : undefined}
+    <>
+      <header
+        className={`gg-chat-header${headerClickable ? " is-clickable" : ""}`}
+        onClick={headerClickable ? onPeerProfileClick : undefined}
+        role={headerClickable ? "button" : undefined}
+        title={headerClickable ? "Pokaż profil" : undefined}
       >
         {peerPresence ? (
-          <span className="gg-chatwin-titlebar-icon gg-friend-dot-wrap" aria-hidden>
+          <span className="gg-chat-header-icon gg-friend-dot-wrap" aria-hidden>
             <span className={`gg-friend-dot ${presenceClass}`} />
             {showUnreadBlink && (
               <span className="gg-friend-dot gg-friend-dot--unread gg-friend-dot--blink" />
             )}
           </span>
         ) : (
-          <img src={sunIcon} alt="" className="gg-chatwin-titlebar-icon" />
+          <img src={sunIcon} alt="" className="gg-chat-header-icon gg-chat-header-icon--ai" />
         )}
-        <span className="gg-chatwin-titlebar-text">
-          {model.name}
-          {sessionTitle ? <span className="gg-chatwin-subtitle"> — {sessionTitle}</span> : null}
-        </span>
-      </div>
+        <div className="gg-chat-header-text">
+          <span className="gg-chat-header-title">{model.name}</span>
+          {sessionTitle ? (
+            <span className="gg-chat-header-sub">{sessionTitle}</span>
+          ) : null}
+        </div>
+      </header>
       <div className="gg-conversation" ref={ref}>
         {messages.map((m) => (
           <Message key={m.id} msg={m} modelName={model.name} emotes={peerChat} />
         ))}
       </div>
-    </div>
+    </>
   );
 }
 

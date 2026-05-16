@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Titlebar } from "./components/Titlebar";
-import { Menubar } from "./components/Menubar";
-import { Toolbar } from "./components/Toolbar";
+import { Rail } from "./components/Rail";
 import { Sidebar } from "./components/Sidebar";
 import { Conversation } from "./components/Conversation";
 import { Composer } from "./components/Composer";
-import { Statusbar } from "./components/Statusbar";
 import { SettingsDialog } from "./components/Settings";
 import { MacrosDialog } from "./components/MacrosDialog";
 import { UpdateToast } from "./components/UpdateToast";
@@ -1814,33 +1812,21 @@ export default function App() {
   return (
     <div className="gg-window">
       <Titlebar title="Gaidu" />
-      <Menubar
-        onOpenSettings={() => setSettingsOpen(true)}
-        onOpenChangelog={() => setChangelogOpen(true)}
-        onCheckForUpdates={onCheckForUpdates}
-        onLogout={settings.network?.token ? onLogout : undefined}
-        loggedInUsername={settings.network?.username ?? null}
-        onQuit={onQuit}
-      />
-      <Toolbar
-        onOpenSettings={() => setSettingsOpen(true)}
-        onOpenMacros={() => setMacrosOpen(true)}
-        onOpenNetwork={() => setNetworkOpen(true)}
-        onToggleSidebar={
-          isMobile ? () => setSidebarMobileOpen((v) => !v) : undefined
-        }
-        onAddFriend={() => {
-          // Bez konta sieciowego nie ma jak dodać znajomego — przekieruj
-          // do logowania, AddFriend bez tokena i tak nic nie zrobi.
-          if (settings.network?.token) {
-            setAddFriendOpen(true);
-          } else {
-            setNetworkOpen(true);
-          }
-        }}
-        networkOnline={wsStatus.kind === "connected"}
-      />
       <div className="gg-body">
+        <Rail
+          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenMacros={() => setMacrosOpen(true)}
+          onOpenNetwork={() => setNetworkOpen(true)}
+          onOpenChangelog={() => setChangelogOpen(true)}
+          onCheckForUpdates={onCheckForUpdates}
+          onLogout={settings.network?.token ? onLogout : undefined}
+          loggedInUsername={settings.network?.username ?? null}
+          onQuit={onQuit}
+          networkOnline={wsStatus.kind === "connected"}
+          onToggleSidebar={
+            isMobile ? () => setSidebarMobileOpen((v) => !v) : undefined
+          }
+        />
         <Sidebar
           models={MODELS}
           activeModelId={activeModelId}
@@ -1875,12 +1861,8 @@ export default function App() {
           onSelectGroup={onSelectGroup}
           onCreateGroup={() => setCreateGroupOpen(true)}
           unreadByGroup={unreadByGroup}
-          description={myDescription}
-          onDescriptionChange={
-            settings.network?.token ? onDescriptionChange : undefined
-          }
           avatar={myAvatar}
-          onChangeAvatar={
+          onOpenProfile={
             settings.network?.token
               ? () => setProfileDialog({ mode: "self" })
               : undefined
@@ -2019,17 +2001,6 @@ export default function App() {
           )}
         </main>
       </div>
-      <Statusbar
-        net={
-          !settings.network?.token
-            ? "logged_out"
-            : wsStatus.kind === "connected"
-              ? "connected"
-              : wsStatus.kind === "connecting" || wsStatus.kind === "reconnecting"
-                ? "connecting"
-                : "disconnected"
-        }
-      />
       <SettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
