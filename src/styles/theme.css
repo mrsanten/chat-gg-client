@@ -1372,20 +1372,6 @@ input, textarea {
   padding: 16px;
 }
 
-[data-theme="dark"] .gg-emote-btn {
-  background: linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 100%);
-  border-color: var(--xp-face-line);
-  color: var(--text);
-}
-[data-theme="dark"] .gg-emote-btn:hover {
-  background: linear-gradient(180deg, #444 0%, #333 100%);
-}
-[data-theme="dark"] .gg-emote-search {
-  background: var(--xp-face);
-  color: var(--text);
-  border-color: var(--xp-face-line);
-}
-
 /* ── Inline emote w wiadomości ─────────────────────────────────────── */
 .gg-msg-body--plain {
   white-space: pre-wrap;
@@ -2038,271 +2024,6 @@ input, textarea {
   text-align: center;
 }
 
-/* ╔══════════════════════════════════════════════════════════════════════╗
-   ║                          DARK THEME                                  ║
-   ║  Aktywowany przez data-theme="dark" na <html>. App.tsx ustawia      ║
-   ║  to na podstawie settings.theme; "system" pyta media query.          ║
-   ╚══════════════════════════════════════════════════════════════════════╝ */
-
-[data-theme="dark"] {
-  /* XP face → dark grays */
-  --xp-face: #25252a;
-  --xp-face-2: #2d2d33;
-  --xp-face-shadow: #16161a;
-  --xp-face-light: #383840;
-  --xp-face-line: #3d3d45;
-
-  /* XP blue trochę przyciemniony — i tak ma kontrast wobec ciemnego tła */
-  --xp-blue-1: #2a5cdb;
-  --xp-blue-2: #2461d8;
-  --xp-blue-3: #0c41a7;
-  --xp-blue-deep: #082882;
-  --xp-blue-titlebar-1: #1d4dac;
-  --xp-blue-titlebar-2: #2562b8;
-  --xp-blue-titlebar-3: #062a78;
-
-  --gg-orange:    #ff8a00;
-  --gg-orange-2:  #ffb444;
-  --gg-yellow:    #ffd000;
-  --gg-green:     #4ad04a;
-  --gg-green-light: #6fdc6f;
-
-  --text:      #e6e6ea;
-  --text-mute: #a0a0a8;
-  --link:      #6fb8ff;
-  --code-bg:   #1a1a1e;
-
-  --shadow-inset-light: inset 1px 1px 0 #4a4a52, inset -1px -1px 0 #16161a;
-  --shadow-inset-deep:  inset 1px 1px 0 #16161a, inset -1px -1px 0 #4a4a52;
-}
-
-/* Hardcoded colory w komponentach — overrides per selector */
-[data-theme="dark"] body { color: var(--text); }
-
-[data-theme="dark"] .gg-window {
-  background: var(--xp-face);
-  border-color: #000;
-}
-
-[data-theme="dark"] .gg-toolbar {
-  background: linear-gradient(180deg, #2f2f36 0%, #25252a 50%, #1c1c20 100%);
-  border-bottom-color: #16161a;
-}
-[data-theme="dark"] .gg-toolbar-btn:hover {
-  border-color: #5a4a1e;
-  background: linear-gradient(180deg, #3d3520, #2a2310);
-}
-[data-theme="dark"] .gg-toolbar-btn:active {
-  background: linear-gradient(180deg, #2a2310, #3d3520);
-}
-[data-theme="dark"] .gg-toolbar-btn-label { color: var(--text); }
-
-[data-theme="dark"] .gg-menubar {
-  background: var(--xp-face);
-  border-bottom-color: var(--xp-face-line);
-  color: var(--text);
-}
-
-[data-theme="dark"] .gg-sidebar {
-  background: var(--xp-face);
-  border-right-color: var(--xp-face-shadow);
-}
-
-[data-theme="dark"] .gg-profile { border-bottom-color: var(--xp-face-line); }
-[data-theme="dark"] .gg-profile-name { color: var(--text); }
-[data-theme="dark"] .gg-profile-desc {
-  background: #1a1a1e;
-  border-color: #555;
-  color: var(--text);
-}
-[data-theme="dark"] .gg-profile-desc::placeholder { color: #777; }
-
-[data-theme="dark"] .gg-section-header { color: var(--text); }
-[data-theme="dark"] .gg-section-toggle { color: var(--text); }
-[data-theme="dark"] .gg-section-title  { color: var(--text); }
-[data-theme="dark"] .gg-section-count  { color: var(--text-mute); }
-
-[data-theme="dark"] .gg-tool-item:hover,
-[data-theme="dark"] .gg-session-item:hover {
-  background: #353540;
-}
-[data-theme="dark"] .gg-tool-item.is-active,
-[data-theme="dark"] .gg-session-item.is-active {
-  background: var(--xp-blue-3);
-  color: #fff;
-}
-
-[data-theme="dark"] .gg-history-empty { color: var(--text-mute); }
-
-[data-theme="dark"] .gg-section-action {
-  background: linear-gradient(180deg, #3a3a44 0%, #25252a 100%);
-  border-color: #16161a;
-  color: var(--text);
-}
-
-/* Conversation */
-[data-theme="dark"] .gg-main { background: var(--xp-face); }
-[data-theme="dark"] .gg-chatwin-titlebar { /* XP gradient zostaje */ }
-[data-theme="dark"] .gg-conversation { background: #1e1e22; }
-
-[data-theme="dark"] .gg-msg-bubble--ai {
-  background: #2f2f36;
-  color: var(--text);
-  border-color: #4a4a52;
-}
-[data-theme="dark"] .gg-msg-bubble--user {
-  background: #2a3f6e;
-  color: #f0f0f4;
-  border-color: #1a2a4d;
-}
-[data-theme="dark"] .gg-msg-author { color: #a0a0a8; }
-[data-theme="dark"] .gg-msg-time { color: var(--text-mute); }
-
-[data-theme="dark"] .gg-msg-copy {
-  background: #2a2a30;
-  color: var(--text-mute);
-  border-color: #555;
-}
-[data-theme="dark"] .gg-msg-copy:hover { background: #3a3a44; color: var(--text); }
-
-/* MessageBody markdown / code */
-[data-theme="dark"] .gg-msg pre,
-[data-theme="dark"] .gg-msg code { background: var(--code-bg); color: #e6e6ea; }
-[data-theme="dark"] .gg-msg blockquote { border-left-color: #555; color: var(--text-mute); }
-[data-theme="dark"] .gg-msg a { color: var(--link); }
-
-/* Composer */
-[data-theme="dark"] .gg-composer {
-  background: var(--xp-face);
-  border-top-color: var(--xp-face-shadow);
-}
-[data-theme="dark"] .gg-composer-input {
-  background: #1a1a1e;
-  border-color: #555;
-  color: var(--text);
-}
-[data-theme="dark"] .gg-composer-input::placeholder { color: #777; }
-
-/* Statusbar */
-[data-theme="dark"] .gg-statusbar {
-  background: var(--xp-face);
-  border-top-color: var(--xp-face-shadow);
-  color: var(--text);
-}
-[data-theme="dark"] .gg-statusbar-cell {
-  border-color: #444;
-  color: var(--text);
-}
-[data-theme="dark"] .gg-signal-bar { background: #555; border-color: #333; }
-[data-theme="dark"] .gg-signal-bar.is-active {
-  background: var(--gg-green);
-  border-color: #115911;
-}
-
-/* Modale */
-[data-theme="dark"] .gg-modal-backdrop { background: rgba(0,0,0,0.7); }
-[data-theme="dark"] .gg-modal { background: var(--xp-face); border-color: var(--xp-blue-deep); }
-[data-theme="dark"] .gg-modal-body { color: var(--text); }
-[data-theme="dark"] .gg-modal-actions { background: var(--xp-face); }
-[data-theme="dark"] .gg-modal-tabs { background: var(--xp-face); border-bottom-color: #4a4a52; }
-[data-theme="dark"] .gg-modal-tab { color: var(--text); }
-[data-theme="dark"] .gg-modal-tab:hover { background: rgba(255, 255, 255, 0.08); }
-[data-theme="dark"] .gg-modal-tab.is-active { background: var(--xp-blue-1); color: #fff; }
-
-[data-theme="dark"] .gg-fieldset {
-  border-color: #4a4a52;
-  background: var(--xp-face-2);
-}
-[data-theme="dark"] .gg-fieldset legend { color: var(--text); background: var(--xp-face-2); }
-[data-theme="dark"] .gg-text-input {
-  background: #1a1a1e;
-  border-color: #555;
-  color: var(--text);
-}
-[data-theme="dark"] .gg-text-input::placeholder { color: #777; }
-[data-theme="dark"] .gg-radio { color: var(--text); }
-[data-theme="dark"] .gg-hint { color: var(--text-mute); }
-[data-theme="dark"] .gg-error {
-  background: #3d1e1e;
-  border-color: #6e3030;
-  color: #ffb0b0;
-}
-[data-theme="dark"] .gg-mini-btn {
-  background: linear-gradient(180deg, #3a3a44 0%, #25252a 100%);
-  border-color: #555;
-  color: var(--text);
-}
-[data-theme="dark"] .gg-mini-btn:hover { background: linear-gradient(180deg, #45454f 0%, #2d2d35 100%); }
-
-[data-theme="dark"] .gg-btn {
-  background: linear-gradient(180deg, #3a3a44 0%, var(--xp-face) 50%, #1d1d22 100%);
-  border-color: #555;
-  color: var(--text);
-}
-[data-theme="dark"] .gg-btn:hover {
-  background: linear-gradient(180deg, #45454f 0%, #34343a 50%, #25252a 100%);
-}
-
-/* Menu dropdown */
-[data-theme="dark"] .gg-menu-dropdown {
-  background: var(--xp-face);
-  border-color: var(--xp-blue-deep);
-}
-[data-theme="dark"] .gg-menu-item { color: var(--text); }
-[data-theme="dark"] .gg-menu-sep { background: var(--xp-face-line); }
-
-/* Macro chips, friend ad, changelog, update toast — ogólny look */
-[data-theme="dark"] .gg-macro-chip,
-[data-theme="dark"] .gg-macro-toggle {
-  filter: brightness(0.9);
-  color: #1a1a1a;
-}
-[data-theme="dark"] .gg-macro-row,
-[data-theme="dark"] .gg-update-toast-notes,
-[data-theme="dark"] .gg-net-stat {
-  background: var(--xp-face-2);
-  border-color: #4a4a52;
-  color: var(--text);
-}
-[data-theme="dark"] .gg-changelog-version { color: #6fb8ff; }
-[data-theme="dark"] .gg-changelog-date { color: var(--text-mute); }
-[data-theme="dark"] .gg-changelog-list { color: var(--text); }
-[data-theme="dark"] .gg-changelog-entry { border-bottom-color: #4a4a52; }
-
-[data-theme="dark"] .gg-update-toast { background: var(--xp-face); border-color: var(--xp-blue-deep); }
-[data-theme="dark"] .gg-update-toast-version-old { color: #888; }
-[data-theme="dark"] .gg-update-toast-arrow { color: #888; }
-[data-theme="dark"] .gg-update-toast-version-new { color: #4ad04a; }
-[data-theme="dark"] .gg-update-toast-progress-bar { background: #1a1a1e; border-color: #555; }
-[data-theme="dark"] .gg-update-toast-progress-label { color: var(--text-mute); }
-
-[data-theme="dark"] .gg-update-notice { background: var(--xp-face); border-color: var(--xp-blue-deep); color: var(--text); }
-
-/* Sidebar Larry ad — żółta ramka pasuje też w darku, lekko stłumiona */
-[data-theme="dark"] .gg-sidebar-ad {
-  background: linear-gradient(180deg, #4d3f10 0%, #2f2606 100%);
-  border-color: #856414;
-}
-[data-theme="dark"] .gg-sidebar-ad-label { color: #ffd980; }
-[data-theme="dark"] .gg-sidebar-ad-text { color: #ffe6a8; }
-[data-theme="dark"] .gg-sidebar-ad-img { background: #000; border-color: #5a4a14; }
-
-/* Net dialog status */
-[data-theme="dark"] .gg-net-stat-label { color: var(--text-mute); }
-[data-theme="dark"] .gg-net-stat-value { color: var(--text); }
-[data-theme="dark"] .gg-ping-chart rect { fill: #1a1a1e; stroke: #4a4a52; }
-[data-theme="dark"] .gg-ping-chart text { fill: #888; }
-
-/* Profile status pod nickiem */
-[data-theme="dark"] .gg-profile-status--offline    { color: #777; }
-[data-theme="dark"] .gg-profile-status--logged_out { color: var(--text-mute); }
-
-/* Statusbar net stany */
-[data-theme="dark"] .gg-statusbar-net--disconnected { color: #888; }
-[data-theme="dark"] .gg-statusbar-net--logged_out   { color: var(--text-mute); }
-
-/* Conversation header subtitle/titlebar typing zostaje XP-blue */
-
 /* Friend item z opisem (rozszerzona wersja gg-session-item) */
 .gg-friend-item {
   display: flex;
@@ -2344,10 +2065,6 @@ input, textarea {
   line-height: 1.2;
 }
 .gg-friend-item.is-active .gg-friend-desc { color: rgba(255, 255, 255, 0.75); }
-
-[data-theme="dark"] .gg-friend-item:hover { background: #2c3a55; }
-[data-theme="dark"] .gg-friend-item { border-bottom-color: var(--xp-face-line); }
-[data-theme="dark"] .gg-friend-item.is-active { background: var(--xp-blue-3); }
 
 /* ── UserProfileDialog ─────────────────────────────────────────────── */
 .gg-userprofile {
@@ -2716,12 +2433,6 @@ input, textarea {
   color: var(--text-mute);
   font-size: 11px;
 }
-[data-theme="dark"] .gg-creategroup-list {
-  background: var(--xp-face);
-}
-[data-theme="dark"] .gg-creategroup-row:hover {
-  background: #2c3a55;
-}
 
 /* Sesja w historii — badge z nazwą modelu obok tytułu. */
 .gg-session-model-badge {
@@ -2791,7 +2502,7 @@ input, textarea {
    ║  (traffic lights na macOS, płaskie kontrolki w stylu Windows 11).     ║
    ╚══════════════════════════════════════════════════════════════════════╝ */
 
-[data-theme="default"] {
+[data-theme^="default"] {
   --xp-face: #f5f5f7;
   --xp-face-2: #ffffff;
   --xp-face-shadow: #d6d6db;
@@ -2826,35 +2537,35 @@ input, textarea {
     "Segoe UI Variable Text", "Segoe UI", system-ui, "Helvetica Neue", sans-serif;
 }
 
-[data-theme="default"] body { color: var(--text); }
+[data-theme^="default"] body { color: var(--text); }
 
 /* Cienki, nowoczesny scrollbar */
-[data-theme="default"] ::-webkit-scrollbar { width: 12px; height: 12px; }
-[data-theme="default"] ::-webkit-scrollbar-track { background: transparent; border: none; }
-[data-theme="default"] ::-webkit-scrollbar-thumb {
+[data-theme^="default"] ::-webkit-scrollbar { width: 12px; height: 12px; }
+[data-theme^="default"] ::-webkit-scrollbar-track { background: transparent; border: none; }
+[data-theme^="default"] ::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.22);
   border: 3px solid transparent;
   background-clip: padding-box;
   border-radius: 8px;
   box-shadow: none;
 }
-[data-theme="default"] ::-webkit-scrollbar-thumb:hover {
+[data-theme^="default"] ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.4);
   background-clip: padding-box;
 }
-[data-theme="default"] ::-webkit-scrollbar-button:single-button {
+[data-theme^="default"] ::-webkit-scrollbar-button:single-button {
   display: none;
 }
 
 /* ── Okno ──────────────────────────────────────────────────────────── */
-[data-theme="default"] .gg-window {
+[data-theme^="default"] .gg-window {
   background: var(--xp-face-2);
   border: 1px solid var(--xp-face-line);
   box-shadow: none;
 }
 
 /* ── Titlebar ──────────────────────────────────────────────────────── */
-[data-theme="default"] .gg-titlebar {
+[data-theme^="default"] .gg-titlebar {
   height: 40px;
   background: var(--xp-face);
   border-bottom: 1px solid var(--xp-face-line);
@@ -2865,25 +2576,25 @@ input, textarea {
   text-shadow: none;
   padding: 0 6px;
 }
-[data-theme="default"] .gg-titlebar::after { display: none; }
-[data-theme="default"] .gg-titlebar-icon { width: 18px; height: 18px; }
+[data-theme^="default"] .gg-titlebar::after { display: none; }
+[data-theme^="default"] .gg-titlebar-icon { width: 18px; height: 18px; }
 
 /* Glyphy w ciemnym kolorze (jasny titlebar) */
-[data-theme="default"] .gg-glyph--min {
+[data-theme^="default"] .gg-glyph--min {
   border-bottom-color: var(--text);
   box-shadow: none;
 }
-[data-theme="default"] .gg-glyph--max {
+[data-theme^="default"] .gg-glyph--max {
   border-color: var(--text);
   box-shadow: inset 0 0 0 0.5px var(--text);
 }
-[data-theme="default"] .gg-glyph--close::before,
-[data-theme="default"] .gg-glyph--close::after { background: var(--text); }
+[data-theme^="default"] .gg-glyph--close::before,
+[data-theme^="default"] .gg-glyph--close::after { background: var(--text); }
 
 /* Przyciski okna w stylu Windows 11 — płaskie, po prawej (każdy OS poza mac) */
-[data-theme="default"]:not([data-os="mac"]) .gg-titlebar { padding-right: 0; }
-[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-buttons { gap: 0; }
-[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn {
+[data-theme^="default"]:not([data-os="mac"]) .gg-titlebar { padding-right: 0; }
+[data-theme^="default"]:not([data-os="mac"]) .gg-titlebar-buttons { gap: 0; }
+[data-theme^="default"]:not([data-os="mac"]) .gg-titlebar-btn {
   width: 46px;
   height: 40px;
   border: none;
@@ -2892,34 +2603,34 @@ input, textarea {
   box-shadow: none;
   color: var(--text);
 }
-[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn:hover {
+[data-theme^="default"]:not([data-os="mac"]) .gg-titlebar-btn:hover {
   background: rgba(0, 0, 0, 0.07);
 }
-[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn:active {
+[data-theme^="default"]:not([data-os="mac"]) .gg-titlebar-btn:active {
   background: rgba(0, 0, 0, 0.12);
 }
-[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:hover {
+[data-theme^="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:hover {
   background: #e81123;
 }
-[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:active {
+[data-theme^="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:active {
   background: #f1707a;
 }
-[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:hover .gg-glyph--close::before,
-[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:hover .gg-glyph--close::after {
+[data-theme^="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:hover .gg-glyph--close::before,
+[data-theme^="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:hover .gg-glyph--close::after {
   background: #ffffff;
 }
 
 /* Przyciski okna w stylu macOS — traffic lights, po lewej */
-[data-theme="default"][data-os="mac"] .gg-titlebar {
+[data-theme^="default"][data-os="mac"] .gg-titlebar {
   padding-left: 12px;
   padding-right: 12px;
 }
-[data-theme="default"][data-os="mac"] .gg-titlebar-buttons {
+[data-theme^="default"][data-os="mac"] .gg-titlebar-buttons {
   order: -1;
   gap: 8px;
   margin-right: 14px;
 }
-[data-theme="default"][data-os="mac"] .gg-titlebar-btn {
+[data-theme^="default"][data-os="mac"] .gg-titlebar-btn {
   width: 12px;
   height: 12px;
   border: none;
@@ -2928,74 +2639,74 @@ input, textarea {
   box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.14);
   color: transparent;
 }
-[data-theme="default"][data-os="mac"] .gg-titlebar-btn .gg-glyph { display: none; }
-[data-theme="default"][data-os="mac"] .gg-titlebar-btn--close { order: 1; background: #ff5f57; }
-[data-theme="default"][data-os="mac"] .gg-titlebar-btn--min   { order: 2; background: #febc2e; }
-[data-theme="default"][data-os="mac"] .gg-titlebar-btn--max   { order: 3; background: #28c840; }
-[data-theme="default"][data-os="mac"] .gg-titlebar-btn:hover { filter: brightness(0.92); }
-[data-theme="default"][data-os="mac"] .gg-titlebar-btn:active { filter: brightness(0.82); }
+[data-theme^="default"][data-os="mac"] .gg-titlebar-btn .gg-glyph { display: none; }
+[data-theme^="default"][data-os="mac"] .gg-titlebar-btn--close { order: 1; background: #ff5f57; }
+[data-theme^="default"][data-os="mac"] .gg-titlebar-btn--min   { order: 2; background: #febc2e; }
+[data-theme^="default"][data-os="mac"] .gg-titlebar-btn--max   { order: 3; background: #28c840; }
+[data-theme^="default"][data-os="mac"] .gg-titlebar-btn:hover { filter: brightness(0.92); }
+[data-theme^="default"][data-os="mac"] .gg-titlebar-btn:active { filter: brightness(0.82); }
 
 /* ── Menubar ───────────────────────────────────────────────────────── */
-[data-theme="default"] .gg-menubar {
+[data-theme^="default"] .gg-menubar {
   background: var(--xp-face-2);
   border-bottom: 1px solid var(--xp-face-line);
   color: var(--text);
 }
-[data-theme="default"] .gg-menubar-item:hover,
-[data-theme="default"] .gg-menubar-item.is-open {
+[data-theme^="default"] .gg-menubar-item:hover,
+[data-theme^="default"] .gg-menubar-item.is-open {
   background: rgba(0, 0, 0, 0.06);
   color: var(--text);
   border-radius: 6px;
 }
 
 /* ── Toolbar ───────────────────────────────────────────────────────── */
-[data-theme="default"] .gg-toolbar {
+[data-theme^="default"] .gg-toolbar {
   background: var(--xp-face-2);
   border-bottom: 1px solid var(--xp-face-line);
 }
-[data-theme="default"] .gg-toolbar-btn { border-radius: 8px; }
-[data-theme="default"] .gg-toolbar-btn:hover {
+[data-theme^="default"] .gg-toolbar-btn { border-radius: 8px; }
+[data-theme^="default"] .gg-toolbar-btn:hover {
   border-color: transparent;
   background: rgba(0, 0, 0, 0.06);
 }
-[data-theme="default"] .gg-toolbar-btn:active { background: rgba(0, 0, 0, 0.1); }
-[data-theme="default"] .gg-toolbar-btn-label { color: var(--text); }
+[data-theme^="default"] .gg-toolbar-btn:active { background: rgba(0, 0, 0, 0.1); }
+[data-theme^="default"] .gg-toolbar-btn-label { color: var(--text); }
 
 /* ── Sidebar ───────────────────────────────────────────────────────── */
-[data-theme="default"] .gg-sidebar {
+[data-theme^="default"] .gg-sidebar {
   background: var(--xp-face);
   border-right: 1px solid var(--xp-face-line);
 }
-[data-theme="default"] .gg-profile { border-bottom-color: var(--xp-face-line); }
-[data-theme="default"] .gg-profile-avatar-frame {
+[data-theme^="default"] .gg-profile { border-bottom-color: var(--xp-face-line); }
+[data-theme^="default"] .gg-profile-avatar-frame {
   border: 1px solid var(--xp-face-line);
   border-radius: 12px;
   box-shadow: none;
 }
-[data-theme="default"] .gg-profile-desc {
+[data-theme^="default"] .gg-profile-desc {
   border: 1px solid var(--xp-face-line);
   border-radius: 6px;
   box-shadow: none;
   background: var(--xp-face-2);
 }
-[data-theme="default"] .gg-section { border-bottom-color: var(--xp-face-line); }
-[data-theme="default"] .gg-section-header { background: transparent; }
-[data-theme="default"] .gg-section-toggle {
+[data-theme^="default"] .gg-section { border-bottom-color: var(--xp-face-line); }
+[data-theme^="default"] .gg-section-header { background: transparent; }
+[data-theme^="default"] .gg-section-toggle {
   border: 1px solid var(--xp-face-line);
   border-radius: 4px;
   background: var(--xp-face-2);
   color: var(--text);
 }
-[data-theme="default"] .gg-section-title { color: var(--text-mute); }
-[data-theme="default"] .gg-section-action {
+[data-theme^="default"] .gg-section-title { color: var(--text-mute); }
+[data-theme^="default"] .gg-section-action {
   background: var(--xp-blue-1);
   border: 1px solid transparent;
   border-radius: 6px;
   color: #ffffff;
 }
-[data-theme="default"] .gg-section-action:hover { background: var(--xp-blue-deep); }
-[data-theme="default"] .gg-sidebar-footer { border-top-color: var(--xp-face-line); }
-[data-theme="default"] .gg-sidebar-ad {
+[data-theme^="default"] .gg-section-action:hover { background: var(--xp-blue-deep); }
+[data-theme^="default"] .gg-sidebar-footer { border-top-color: var(--xp-face-line); }
+[data-theme^="default"] .gg-sidebar-ad {
   background: #fff8e6;
   border: 1px solid #f0e0b0;
   border-radius: 8px;
@@ -3003,37 +2714,37 @@ input, textarea {
 }
 
 /* Pozycje list — tool / session / friend */
-[data-theme="default"] .gg-tool-item,
-[data-theme="default"] .gg-session-item {
+[data-theme^="default"] .gg-tool-item,
+[data-theme^="default"] .gg-session-item {
   border-radius: 6px;
   margin: 1px 4px;
 }
-[data-theme="default"] .gg-tool-item:hover,
-[data-theme="default"] .gg-session-item:hover,
-[data-theme="default"] .gg-friend-item:hover {
+[data-theme^="default"] .gg-tool-item:hover,
+[data-theme^="default"] .gg-session-item:hover,
+[data-theme^="default"] .gg-friend-item:hover {
   background: rgba(0, 0, 0, 0.05);
 }
-[data-theme="default"] .gg-tool-item.is-active,
-[data-theme="default"] .gg-session-item.is-active {
+[data-theme^="default"] .gg-tool-item.is-active,
+[data-theme^="default"] .gg-session-item.is-active {
   background: var(--xp-blue-1);
   color: #ffffff;
   border: 1px solid transparent;
 }
-[data-theme="default"] .gg-friend-item { border-bottom-color: var(--xp-face-line); }
-[data-theme="default"] .gg-friend-item.is-active {
+[data-theme^="default"] .gg-friend-item { border-bottom-color: var(--xp-face-line); }
+[data-theme^="default"] .gg-friend-item.is-active {
   background: var(--xp-blue-1);
   color: #ffffff;
 }
 
 /* ── Obszar czatu ──────────────────────────────────────────────────── */
-[data-theme="default"] .gg-main { background: var(--xp-face); }
-[data-theme="default"] .gg-chatwin {
+[data-theme^="default"] .gg-main { background: var(--xp-face); }
+[data-theme^="default"] .gg-chatwin {
   border: 1px solid var(--xp-face-line);
   border-radius: 12px;
   overflow: hidden;
   background: var(--xp-face-2);
 }
-[data-theme="default"] .gg-chatwin-titlebar {
+[data-theme^="default"] .gg-chatwin-titlebar {
   height: 32px;
   background: var(--xp-face-2);
   border-bottom: 1px solid var(--xp-face-line);
@@ -3041,97 +2752,97 @@ input, textarea {
   font-weight: 600;
   text-shadow: none;
 }
-[data-theme="default"] .gg-chatwin-titlebar::after { display: none; }
-[data-theme="default"] .gg-chatwin-titlebar.is-clickable:hover {
+[data-theme^="default"] .gg-chatwin-titlebar::after { display: none; }
+[data-theme^="default"] .gg-chatwin-titlebar.is-clickable:hover {
   filter: none;
   background: rgba(0, 0, 0, 0.03);
 }
-[data-theme="default"] .gg-chatwin-titlebar-btn {
+[data-theme^="default"] .gg-chatwin-titlebar-btn {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 5px;
   color: var(--text-mute);
 }
-[data-theme="default"] .gg-chatwin-titlebar-btn:hover { background: rgba(0, 0, 0, 0.06); }
+[data-theme^="default"] .gg-chatwin-titlebar-btn:hover { background: rgba(0, 0, 0, 0.06); }
 
-[data-theme="default"] .gg-conversation { background: var(--xp-face-2); }
-[data-theme="default"] .gg-msg-bubble { border-radius: 16px; }
-[data-theme="default"] .gg-msg-bubble--ai {
+[data-theme^="default"] .gg-conversation { background: var(--xp-face-2); }
+[data-theme^="default"] .gg-msg-bubble { border-radius: 16px; }
+[data-theme^="default"] .gg-msg-bubble--ai {
   background: #f0f0f3;
   border: 1px solid transparent;
   color: var(--text);
 }
-[data-theme="default"] .gg-msg-bubble--user {
+[data-theme^="default"] .gg-msg-bubble--user {
   background: var(--xp-blue-1);
   border: 1px solid transparent;
   color: #ffffff;
 }
-[data-theme="default"] .gg-msg--ai .gg-msg-author { color: var(--text-mute); }
-[data-theme="default"] .gg-msg--user .gg-msg-author { color: rgba(255, 255, 255, 0.8); }
-[data-theme="default"] .gg-msg-time { color: var(--text-mute); }
-[data-theme="default"] .gg-msg--user .gg-msg-body strong { color: #ffffff; }
-[data-theme="default"] .gg-msg--user .gg-msg-body a { color: #ffffff; }
-[data-theme="default"] .gg-msg--user .gg-msg-body code {
+[data-theme^="default"] .gg-msg--ai .gg-msg-author { color: var(--text-mute); }
+[data-theme^="default"] .gg-msg--user .gg-msg-author { color: rgba(255, 255, 255, 0.8); }
+[data-theme^="default"] .gg-msg-time { color: var(--text-mute); }
+[data-theme^="default"] .gg-msg--user .gg-msg-body strong { color: #ffffff; }
+[data-theme^="default"] .gg-msg--user .gg-msg-body a { color: #ffffff; }
+[data-theme^="default"] .gg-msg--user .gg-msg-body code {
   background: rgba(255, 255, 255, 0.18);
   border-color: transparent;
   color: #ffffff;
 }
 
 /* Bloki kodu */
-[data-theme="default"] .gg-msg-body code {
+[data-theme^="default"] .gg-msg-body code {
   background: var(--code-bg);
   border: 1px solid var(--xp-face-line);
   border-radius: 4px;
 }
-[data-theme="default"] .gg-msg-body pre,
-[data-theme="default"] .gg-codeblock {
+[data-theme^="default"] .gg-msg-body pre,
+[data-theme^="default"] .gg-codeblock {
   border: 1px solid var(--xp-face-line);
   border-radius: 8px;
 }
-[data-theme="default"] .gg-codeblock pre { border: none; border-radius: 0; }
-[data-theme="default"] .gg-codeblock-bar {
+[data-theme^="default"] .gg-codeblock pre { border: none; border-radius: 0; }
+[data-theme^="default"] .gg-codeblock-bar {
   background: var(--xp-face);
   color: var(--text-mute);
 }
-[data-theme="default"] .gg-copy-btn,
-[data-theme="default"] .gg-msg-copy {
+[data-theme^="default"] .gg-copy-btn,
+[data-theme^="default"] .gg-msg-copy {
   background: var(--xp-face-2);
   border: 1px solid var(--xp-face-line);
   border-radius: 6px;
   color: var(--text);
 }
-[data-theme="default"] .gg-msg-image,
-[data-theme="default"] .gg-msg-attachment {
+[data-theme^="default"] .gg-msg-image,
+[data-theme^="default"] .gg-msg-attachment {
   border: 1px solid var(--xp-face-line);
   border-radius: 8px;
 }
 
 /* ── Composer ──────────────────────────────────────────────────────── */
-[data-theme="default"] .gg-composer {
+[data-theme^="default"] .gg-composer {
   background: var(--xp-face-2);
   border-top: 1px solid var(--xp-face-line);
 }
-[data-theme="default"] .gg-composer-input {
+[data-theme^="default"] .gg-composer-input {
   border: 1px solid var(--xp-face-line);
   border-radius: 10px;
   box-shadow: none;
   background: var(--xp-face-2);
 }
-[data-theme="default"] .gg-composer-input:focus {
+[data-theme^="default"] .gg-composer-input:focus {
   border-color: var(--xp-blue-1);
   box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
 }
-[data-theme="default"] .gg-composer-attachments {
+[data-theme^="default"] .gg-composer-attachments {
   border: 1px solid var(--xp-face-line);
   border-radius: 10px;
   box-shadow: none;
 }
-[data-theme="default"] .gg-attachment {
+[data-theme^="default"] .gg-attachment {
   border: 1px solid var(--xp-face-line);
   border-radius: 8px;
 }
 
-[data-theme="default"] .gg-send-btn {
+[data-theme^="default"] .gg-send-btn {
   background: var(--gg-orange);
   border: 1px solid transparent;
   border-radius: 10px;
@@ -3139,101 +2850,101 @@ input, textarea {
   box-shadow: none;
   font-weight: 600;
 }
-[data-theme="default"] .gg-send-btn:hover { background: #ff8000; }
-[data-theme="default"] .gg-send-btn:active { background: #e67e00; }
-[data-theme="default"] .gg-stop-btn {
+[data-theme^="default"] .gg-send-btn:hover { background: #ff8000; }
+[data-theme^="default"] .gg-send-btn:active { background: #e67e00; }
+[data-theme^="default"] .gg-stop-btn {
   background: #ff3b30;
   border: 1px solid transparent;
   border-radius: 10px;
   box-shadow: none;
   text-shadow: none;
 }
-[data-theme="default"] .gg-stop-btn:hover { background: #e0352b; }
+[data-theme^="default"] .gg-stop-btn:hover { background: #e0352b; }
 
 /* Macro chips / toggle */
-[data-theme="default"] .gg-macro-chip,
-[data-theme="default"] .gg-macro-toggle {
+[data-theme^="default"] .gg-macro-chip,
+[data-theme^="default"] .gg-macro-toggle {
   background: var(--xp-face);
   border: 1px solid var(--xp-face-line);
   color: var(--text);
   box-shadow: none;
 }
-[data-theme="default"] .gg-macro-chip:hover:not(:disabled),
-[data-theme="default"] .gg-macro-toggle:hover:not(:disabled) {
+[data-theme^="default"] .gg-macro-chip:hover:not(:disabled),
+[data-theme^="default"] .gg-macro-toggle:hover:not(:disabled) {
   background: rgba(0, 0, 0, 0.05);
 }
-[data-theme="default"] .gg-macro-toggle.is-active {
+[data-theme^="default"] .gg-macro-toggle.is-active {
   background: rgba(48, 209, 88, 0.16);
   border-color: var(--gg-green);
   color: #1a7a32;
 }
-[data-theme="default"] .gg-macro-row {
+[data-theme^="default"] .gg-macro-row {
   background: var(--xp-face);
   border: 1px solid var(--xp-face-line);
   border-radius: 8px;
 }
 
 /* Emote picker */
-[data-theme="default"] .gg-emote-btn {
+[data-theme^="default"] .gg-emote-btn {
   background: var(--xp-face);
   border: 1px solid var(--xp-face-line);
   border-radius: 10px;
   box-shadow: none;
   color: var(--text-mute);
 }
-[data-theme="default"] .gg-emote-btn:hover { background: rgba(0, 0, 0, 0.05); }
-[data-theme="default"] .gg-emote-btn.is-open {
+[data-theme^="default"] .gg-emote-btn:hover { background: rgba(0, 0, 0, 0.05); }
+[data-theme^="default"] .gg-emote-btn.is-open {
   background: rgba(0, 0, 0, 0.08);
   box-shadow: none;
 }
-[data-theme="default"] .gg-emote-popover {
+[data-theme^="default"] .gg-emote-popover {
   background: var(--xp-face-2);
   border: 1px solid var(--xp-face-line);
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
 }
-[data-theme="default"] .gg-emote-tabs {
+[data-theme^="default"] .gg-emote-tabs {
   background: transparent;
   border-bottom-color: var(--xp-face-line);
 }
-[data-theme="default"] .gg-emote-tab { border-radius: 6px; }
-[data-theme="default"] .gg-emote-tab.is-active {
+[data-theme^="default"] .gg-emote-tab { border-radius: 6px; }
+[data-theme^="default"] .gg-emote-tab.is-active {
   background: var(--xp-blue-1);
   border-color: transparent;
 }
-[data-theme="default"] .gg-emote-search {
+[data-theme^="default"] .gg-emote-search {
   border: 1px solid var(--xp-face-line);
   border-radius: 6px;
   background: var(--xp-face-2);
 }
-[data-theme="default"] .gg-emote-cell { border-radius: 8px; }
-[data-theme="default"] .gg-emote-cell:hover {
+[data-theme^="default"] .gg-emote-cell { border-radius: 8px; }
+[data-theme^="default"] .gg-emote-cell:hover {
   background: rgba(10, 132, 255, 0.12);
   border-color: transparent;
 }
 
 /* ── Statusbar ─────────────────────────────────────────────────────── */
-[data-theme="default"] .gg-statusbar {
+[data-theme^="default"] .gg-statusbar {
   background: var(--xp-face);
   border-top: 1px solid var(--xp-face-line);
   color: var(--text-mute);
 }
-[data-theme="default"] .gg-statusbar-cell {
+[data-theme^="default"] .gg-statusbar-cell {
   border: 1px solid var(--xp-face-line);
   border-radius: 6px;
   box-shadow: none;
 }
 
 /* ── Modale ────────────────────────────────────────────────────────── */
-[data-theme="default"] .gg-modal-backdrop { background: rgba(0, 0, 0, 0.28); }
-[data-theme="default"] .gg-modal {
+[data-theme^="default"] .gg-modal-backdrop { background: rgba(0, 0, 0, 0.28); }
+[data-theme^="default"] .gg-modal {
   background: var(--xp-face-2);
   border: 1px solid var(--xp-face-line);
   border-radius: 14px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
   overflow: hidden;
 }
-[data-theme="default"] .gg-modal-titlebar {
+[data-theme^="default"] .gg-modal-titlebar {
   height: 36px;
   background: var(--xp-face-2);
   border-bottom: 1px solid var(--xp-face-line);
@@ -3241,42 +2952,42 @@ input, textarea {
   font-weight: 600;
   text-shadow: none;
 }
-[data-theme="default"] .gg-modal-tabs { background: transparent; }
-[data-theme="default"] .gg-modal-tab { border-radius: 8px 8px 0 0; }
-[data-theme="default"] .gg-modal-tab.is-active {
+[data-theme^="default"] .gg-modal-tabs { background: transparent; }
+[data-theme^="default"] .gg-modal-tab { border-radius: 8px 8px 0 0; }
+[data-theme^="default"] .gg-modal-tab.is-active {
   background: var(--xp-blue-1);
   border-color: transparent;
 }
-[data-theme="default"] .gg-modal-actions {
+[data-theme^="default"] .gg-modal-actions {
   background: var(--xp-face);
   border-top: 1px solid var(--xp-face-line);
 }
-[data-theme="default"] .gg-fieldset {
+[data-theme^="default"] .gg-fieldset {
   background: var(--xp-face);
   border: 1px solid var(--xp-face-line);
   border-radius: 10px;
 }
-[data-theme="default"] .gg-text-input {
+[data-theme^="default"] .gg-text-input {
   border: 1px solid var(--xp-face-line);
   border-radius: 8px;
   box-shadow: none;
   background: var(--xp-face-2);
 }
-[data-theme="default"] .gg-text-input:focus {
+[data-theme^="default"] .gg-text-input:focus {
   border-color: var(--xp-blue-1);
   box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
 }
-[data-theme="default"] .gg-btn,
-[data-theme="default"] .gg-mini-btn {
+[data-theme^="default"] .gg-btn,
+[data-theme^="default"] .gg-mini-btn {
   background: var(--xp-face-2);
   border: 1px solid var(--xp-face-line);
   border-radius: 8px;
   box-shadow: none;
   color: var(--text);
 }
-[data-theme="default"] .gg-btn:hover,
-[data-theme="default"] .gg-mini-btn:hover { background: rgba(0, 0, 0, 0.04); }
-[data-theme="default"] .gg-error {
+[data-theme^="default"] .gg-btn:hover,
+[data-theme^="default"] .gg-mini-btn:hover { background: rgba(0, 0, 0, 0.04); }
+[data-theme^="default"] .gg-error {
   background: #fdecea;
   border: 1px solid #f3b5af;
   border-radius: 8px;
@@ -3284,57 +2995,201 @@ input, textarea {
 }
 
 /* Menu dropdown / newsession */
-[data-theme="default"] .gg-menu-dropdown,
-[data-theme="default"] .gg-newsession-menu {
+[data-theme^="default"] .gg-menu-dropdown,
+[data-theme^="default"] .gg-newsession-menu {
   background: var(--xp-face-2);
   border: 1px solid var(--xp-face-line);
   border-radius: 10px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
   padding: 4px;
 }
-[data-theme="default"] .gg-menu-item,
-[data-theme="default"] .gg-newsession-item { border-radius: 6px; }
-[data-theme="default"] .gg-menu-item:hover { background: var(--xp-blue-1); }
-[data-theme="default"] .gg-menu-sep { background: var(--xp-face-line); }
+[data-theme^="default"] .gg-menu-item,
+[data-theme^="default"] .gg-newsession-item { border-radius: 6px; }
+[data-theme^="default"] .gg-menu-item:hover { background: var(--xp-blue-1); }
+[data-theme^="default"] .gg-menu-sep { background: var(--xp-face-line); }
 
 /* Update toast / notice */
-[data-theme="default"] .gg-update-toast,
-[data-theme="default"] .gg-update-notice {
+[data-theme^="default"] .gg-update-toast,
+[data-theme^="default"] .gg-update-notice {
   background: var(--xp-face-2);
   border: 1px solid var(--xp-face-line);
   border-radius: 12px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
   overflow: hidden;
 }
-[data-theme="default"] .gg-update-toast-header {
+[data-theme^="default"] .gg-update-toast-header {
   background: var(--xp-face);
   color: var(--text);
   border-bottom: 1px solid var(--xp-face-line);
 }
-[data-theme="default"] .gg-update-toast-title { text-shadow: none; }
-[data-theme="default"] .gg-update-toast-notes {
+[data-theme^="default"] .gg-update-toast-title { text-shadow: none; }
+[data-theme^="default"] .gg-update-toast-notes {
   background: var(--xp-face);
   border: 1px solid var(--xp-face-line);
   border-radius: 6px;
 }
 
 /* Net status / create group / user profile */
-[data-theme="default"] .gg-net-stat {
+[data-theme^="default"] .gg-net-stat {
   background: var(--xp-face);
   border: 1px solid var(--xp-face-line);
   border-radius: 6px;
 }
-[data-theme="default"] .gg-creategroup-list {
+[data-theme^="default"] .gg-creategroup-list {
   border: 1px solid var(--xp-face-line);
   border-radius: 8px;
 }
-[data-theme="default"] .gg-creategroup-row:hover { background: rgba(10, 132, 255, 0.1); }
-[data-theme="default"] .gg-userprofile-avatar {
+[data-theme^="default"] .gg-creategroup-row:hover { background: rgba(10, 132, 255, 0.1); }
+[data-theme^="default"] .gg-userprofile-avatar {
   border: 1px solid var(--xp-face-line);
   border-radius: 14px;
   box-shadow: none;
 }
-[data-theme="default"] .gg-userprofile-desc {
+[data-theme^="default"] .gg-userprofile-desc {
   border: 1px solid var(--xp-face-line);
   border-radius: 8px;
 }
+
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║         DEFAULT THEME — wariant ciemny (data-theme="default-dark")     ║
+   ║  Dziedziczy wszystkie reguły [data-theme^="default"] (płaski look),   ║
+   ║  podmienia paletę na ciemną i nadpisuje kilka jasnych wartości        ║
+   ║  hardcoded (hover overlays, bańki czatu, ramki).                      ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+
+[data-theme="default-dark"] {
+  --xp-face: #1c1c1e;
+  --xp-face-2: #2c2c2e;
+  --xp-face-shadow: #48484a;
+  --xp-face-light: #2c2c2e;
+  --xp-face-line: #38383a;
+
+  --xp-blue-1: #0a84ff;
+  --xp-blue-2: #0a84ff;
+  --xp-blue-3: #0a84ff;
+  --xp-blue-deep: #409cff;
+  --xp-blue-titlebar-1: #1c1c1e;
+  --xp-blue-titlebar-2: #1c1c1e;
+  --xp-blue-titlebar-3: #1c1c1e;
+
+  --gg-orange: #ff9f0a;
+  --gg-orange-2: #ffb340;
+  --gg-yellow: #ffd60a;
+  --gg-green: #30d158;
+  --gg-green-light: #4cdf72;
+
+  --text: #f5f5f7;
+  --text-mute: #98989d;
+  --link: #409cff;
+  --code-bg: #1c1c1e;
+}
+
+/* Scrollbar — jaśniejszy thumb na ciemnym tle */
+[data-theme="default-dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: padding-box;
+}
+[data-theme="default-dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+  background-clip: padding-box;
+}
+
+/* Hover overlay — jasny zamiast ciemnego */
+[data-theme="default-dark"] .gg-menubar-item:hover,
+[data-theme="default-dark"] .gg-menubar-item.is-open,
+[data-theme="default-dark"] .gg-toolbar-btn:hover,
+[data-theme="default-dark"] .gg-tool-item:hover,
+[data-theme="default-dark"] .gg-session-item:hover,
+[data-theme="default-dark"] .gg-friend-item:hover,
+[data-theme="default-dark"] .gg-chatwin-titlebar.is-clickable:hover,
+[data-theme="default-dark"] .gg-chatwin-titlebar-btn:hover,
+[data-theme="default-dark"] .gg-macro-chip:hover:not(:disabled),
+[data-theme="default-dark"] .gg-macro-toggle:hover:not(:disabled),
+[data-theme="default-dark"] .gg-emote-btn:hover,
+[data-theme="default-dark"] .gg-btn:hover,
+[data-theme="default-dark"] .gg-mini-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+[data-theme="default-dark"] .gg-toolbar-btn:active,
+[data-theme="default-dark"] .gg-emote-btn.is-open {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+/* Przyciski okna w stylu Windows na ciemnym titlebarze */
+[data-theme="default-dark"]:not([data-os="mac"]) .gg-titlebar-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+[data-theme="default-dark"]:not([data-os="mac"]) .gg-titlebar-btn:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+[data-theme="default-dark"]:not([data-os="mac"]) .gg-titlebar-btn--close:hover {
+  background: #e81123;
+}
+
+/* Bańki czatu */
+[data-theme="default-dark"] .gg-msg-bubble--ai { background: #3a3a3c; }
+[data-theme="default-dark"] .gg-msg--ai .gg-msg-body strong,
+[data-theme="default-dark"] .gg-msg--ai .gg-msg-body h1,
+[data-theme="default-dark"] .gg-msg--ai .gg-msg-body h2,
+[data-theme="default-dark"] .gg-msg--ai .gg-msg-body h3,
+[data-theme="default-dark"] .gg-msg--ai .gg-msg-body h4,
+[data-theme="default-dark"] .gg-msg--ai .gg-msg-body h5,
+[data-theme="default-dark"] .gg-msg--ai .gg-msg-body h6 { color: #dfe6f5; }
+[data-theme="default-dark"] .gg-msg--ai .gg-msg-body blockquote {
+  color: var(--text-mute);
+  border-left-color: #4a5a8a;
+  background: rgba(64, 156, 255, 0.1);
+}
+
+/* Macro toggle aktywny — czytelny tekst na ciemnym */
+[data-theme="default-dark"] .gg-macro-toggle.is-active { color: #4cdf72; }
+
+/* Modal backdrop — głębszy na ciemnym */
+[data-theme="default-dark"] .gg-modal-backdrop { background: rgba(0, 0, 0, 0.55); }
+
+/* Menu dropdown — jasny tekst */
+[data-theme="default-dark"] .gg-menu-item { color: var(--text); }
+
+/* Error box */
+[data-theme="default-dark"] .gg-error,
+[data-theme="default-dark"] .gg-update-toast-error {
+  background: #3a1d1b;
+  border-color: #6e3a36;
+  color: #ff8a80;
+}
+
+/* Reklama sidebar — ciepła ramka w ciemnym wariancie */
+[data-theme="default-dark"] .gg-sidebar-ad {
+  background: #2e2a18;
+  border-color: #4a4126;
+}
+[data-theme="default-dark"] .gg-sidebar-ad-label { color: #ffd980; }
+[data-theme="default-dark"] .gg-sidebar-ad-text { color: #ffe6a8; }
+[data-theme="default-dark"] .gg-sidebar-ad-img { background: #000; border-color: #4a4126; }
+
+/* Placeholdery pól tekstowych */
+[data-theme="default-dark"] .gg-composer-input::placeholder,
+[data-theme="default-dark"] .gg-text-input::placeholder,
+[data-theme="default-dark"] .gg-profile-desc::placeholder { color: #6e6e73; }
+
+/* Statusbar — paski sygnału */
+[data-theme="default-dark"] .gg-signal-bar { background: #48484a; border-color: #2c2c2e; }
+
+/* Update toast / changelog / net — drobne kolory */
+[data-theme="default-dark"] .gg-update-toast-version-new,
+[data-theme="default-dark"] .gg-update-toast-installing { color: #4cdf72; }
+[data-theme="default-dark"] .gg-update-toast-version-old,
+[data-theme="default-dark"] .gg-update-toast-arrow,
+[data-theme="default-dark"] .gg-update-toast-progress-label { color: var(--text-mute); }
+[data-theme="default-dark"] .gg-update-toast-progress-bar {
+  background: #1c1c1e;
+  border-color: var(--xp-face-line);
+}
+[data-theme="default-dark"] .gg-update-toast-notes { color: var(--text); }
+[data-theme="default-dark"] .gg-changelog-date { color: var(--text-mute); }
+[data-theme="default-dark"] .gg-net-stat-label { color: var(--text-mute); }
+[data-theme="default-dark"] .gg-ping-chart rect {
+  fill: #1c1c1e;
+  stroke: var(--xp-face-line);
+}
+[data-theme="default-dark"] .gg-ping-chart text { fill: var(--text-mute); }

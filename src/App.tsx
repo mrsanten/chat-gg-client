@@ -364,17 +364,20 @@ export default function App() {
         : "other";
   }, []);
 
-  // Theme: ustawiamy data-theme="default"/"light"/"dark" na <html>. CSS używa
-  // [data-theme="..."] selectorów do nadpisania kolorów. Tryb "system"
-  // śledzi preferencję OS (matchMedia) i mapuje na klasyczny light/dark.
+  // Theme: ustawiamy data-theme="default"/"default-dark"/"light" na <html>.
+  // CSS używa [data-theme^="default"] / [data-theme="..."] do kolorów.
+  // "system" śledzi preferencję OS i przełącza nowy jasny/ciemny. Stary XP
+  // "dark" został usunięty — stara wartość mapuje się na "default-dark".
   useEffect(() => {
     const choice = settings.theme ?? "default";
     const apply = () => {
-      let resolved: "default" | "light" | "dark";
+      let resolved: "default" | "default-dark" | "light";
       if (choice === "system") {
         resolved = window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
+          ? "default-dark"
+          : "default";
+      } else if ((choice as string) === "dark") {
+        resolved = "default-dark";
       } else {
         resolved = choice;
       }

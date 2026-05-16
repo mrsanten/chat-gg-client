@@ -122,10 +122,11 @@ export interface Settings {
   macros: Macro[];
   profile: ProfileSettings;
   network: NetworkSettings;
-  /** Motyw aplikacji. "default" to nowoczesny minimalistyczny look (2026),
-   *  "light"/"dark" to klasyczny XP Luna, "system" śledzi preferencję OS.
-   *  Default: "default". */
-  theme?: "default" | "light" | "dark" | "system";
+  /** Motyw aplikacji. "default"/"default-dark" to nowoczesny minimalistyczny
+   *  look (2026) w wariancie jasnym/ciemnym, "light" to klasyczny XP Luna
+   *  ("Doomer Style"), "system" śledzi preferencję OS. Default: "default".
+   *  Stara wartość "dark" (XP) jest mapowana na "default-dark" w App.tsx. */
+  theme?: "default" | "default-dark" | "light" | "system";
 }
 
 export const DEFAULT_SETTINGS: Settings = {

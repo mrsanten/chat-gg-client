@@ -146,18 +146,18 @@ export function SettingsDialog({ open, onClose, onSaved }: Props) {
               <label className="gg-radio">
                 <input
                   type="radio"
-                  checked={settings.theme === "light"}
-                  onChange={() => setSettings((s) => ({ ...s, theme: "light" }))}
+                  checked={settings.theme === "default-dark"}
+                  onChange={() => setSettings((s) => ({ ...s, theme: "default-dark" }))}
                 />
-                Jasny (XP Luna)
+                Domyślny ciemny
               </label>
               <label className="gg-radio">
                 <input
                   type="radio"
-                  checked={settings.theme === "dark"}
-                  onChange={() => setSettings((s) => ({ ...s, theme: "dark" }))}
+                  checked={settings.theme === "light"}
+                  onChange={() => setSettings((s) => ({ ...s, theme: "light" }))}
                 />
-                Ciemny
+                Doomer Style
               </label>
               <label className="gg-radio">
                 <input
@@ -165,7 +165,7 @@ export function SettingsDialog({ open, onClose, onSaved }: Props) {
                   checked={settings.theme === "system"}
                   onChange={() => setSettings((s) => ({ ...s, theme: "system" }))}
                 />
-                Według systemu
+                Według systemu (jasny/ciemny)
               </label>
             </fieldset>
           )}

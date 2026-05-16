@@ -45,9 +45,14 @@ function mergeDefaults(s: Partial<Settings> | null | undefined): Settings {
       password: typeof s.network?.password === "string" ? s.network.password : null,
     },
     theme:
-      s.theme === "dark" || s.theme === "system" || s.theme === "light"
+      s.theme === "default" ||
+      s.theme === "default-dark" ||
+      s.theme === "light" ||
+      s.theme === "system"
         ? s.theme
-        : "light",
+        : (s.theme as unknown) === "dark"
+          ? "default-dark" // legacy: stary XP dark → nowy ciemny
+          : "default",
   };
 }
 
