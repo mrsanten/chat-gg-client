@@ -216,11 +216,11 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      // listSessions wymaga tokenu (REST), więc na boot zaczynamy od pustej
-      // listy i refreshujemy w tryRestore po zweryfikowaniu auth.
+      // listSessions() bez tokenu zwraca lokalne sesje (Tauri local file —
+      // przeżywa update apki). tryRestore później dorzuci server-side sync.
       const s = await loadSettings();
       setSettings(s);
-      setSessions([]);
+      void listSessions().then(setSessions);
       // Walidacja JWT przy starcie. Jeśli nieważny → wyczyść z settings,
       // żeby przy następnym otwarciu NetworkAccountDialog user widział
       // formularz logowania zamiast „już zalogowany".
