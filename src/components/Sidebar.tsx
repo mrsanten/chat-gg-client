@@ -17,7 +17,8 @@ interface Props {
   sessions: SessionMeta[];
   activeSessionId: string | null;
   onSelectSession: (id: string) => void;
-  onNewSession: () => void;
+  /** Nowa rozmowa z konkretnym modelem (atomowo). */
+  onStartNewSession: (modelId: string) => void;
   onDeleteSession: (id: string) => void;
   nick?: string;
   /**
@@ -63,7 +64,7 @@ export function Sidebar(props: Props) {
     sessions,
     activeSessionId,
     onSelectSession,
-    onNewSession,
+    onStartNewSession,
     onDeleteSession,
     nick,
     presence,
@@ -349,8 +350,8 @@ export function Sidebar(props: Props) {
             models={models}
             configuredByModel={configuredByModel}
             onPick={(modelId) => {
-              onSelectModel(modelId);
-              onNewSession();
+              onStartNewSession(modelId);
+              onMobileClose?.();
             }}
           />
         }

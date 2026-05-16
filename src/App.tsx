@@ -700,15 +700,29 @@ export default function App() {
       abortRef.current?.abort();
       setIsStreaming(false);
     }
-    await switchActiveSession(activeModelId, id);
+    setActivePeerUsername(null);
+    setActiveGroupId(null);
+    // KLUCZOWE: sesja ma WŁASNY modelId. Wybór sesji musi przestawić
+    // activeModelId na model TEJ sesji, inaczej onSend ostempluje ją
+    // globalnym activeModelId i nadpisze model starej rozmowy.
+    const meta = sessions.find((s) => s.id === id);
+    const modelId = meta?.modelId ?? activeModelId;
+    setActiveModelId(modelId);
+    await switchActiveSession(modelId, id);
   };
 
-  const onNewSession = () => {
+  /** Nowa rozmowa z konkretnym modelem — atomowo (model + clear session).
+   *  Zastępuje stary onSelectModel+onNewSession combo, który cierpiał na
+   *  stale-closure (onNewSession czytał activeModelId sprzed setState-u). */
+  const onStartNewSession = (modelId: string) => {
     if (isStreaming) {
       abortRef.current?.abort();
       setIsStreaming(false);
     }
-    setActiveSessionByModel((prev) => ({ ...prev, [activeModelId]: null }));
+    setActivePeerUsername(null);
+    setActiveGroupId(null);
+    setActiveModelId(modelId);
+    setActiveSessionByModel((prev) => ({ ...prev, [modelId]: null }));
   };
 
   const onDeleteSession = async (id: string) => {
@@ -1821,7 +1835,7 @@ export default function App() {
           sessions={sessions}
           activeSessionId={activeSessionId}
           onSelectSession={onSelectSession}
-          onNewSession={onNewSession}
+          onStartNewSession={onStartNewSession}
           onDeleteSession={onDeleteSession}
           nick={settings.network?.username ?? undefined}
           presence={
