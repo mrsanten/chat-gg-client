@@ -138,7 +138,15 @@ export function SettingsDialog({ open, onClose, onSaved }: Props) {
               <label className="gg-radio">
                 <input
                   type="radio"
-                  checked={(settings.theme ?? "light") === "light"}
+                  checked={(settings.theme ?? "default") === "default"}
+                  onChange={() => setSettings((s) => ({ ...s, theme: "default" }))}
+                />
+                Domyślny (nowoczesny)
+              </label>
+              <label className="gg-radio">
+                <input
+                  type="radio"
+                  checked={settings.theme === "light"}
                   onChange={() => setSettings((s) => ({ ...s, theme: "light" }))}
                 />
                 Jasny (XP Luna)

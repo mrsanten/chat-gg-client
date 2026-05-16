@@ -2782,3 +2782,559 @@ input, textarea {
   color: var(--text-mute);
   margin-left: 8px;
 }
+
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║                  DEFAULT THEME — nowoczesny minimalizm (2026)         ║
+   ║  Aktywowany przez data-theme="default" na <html>. Płaski, jasny look  ║
+   ║  inspirowany macOS/iOS: hairline borders, zaokrąglenia, miękkie       ║
+   ║  cienie, font systemowy. Natywne przyciski okna zależą od data-os     ║
+   ║  (traffic lights na macOS, płaskie kontrolki w stylu Windows 11).     ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+
+[data-theme="default"] {
+  --xp-face: #f5f5f7;
+  --xp-face-2: #ffffff;
+  --xp-face-shadow: #d6d6db;
+  --xp-face-light: #ffffff;
+  --xp-face-line: #e6e6ea;
+
+  --xp-blue-1: #0a84ff;
+  --xp-blue-2: #0a84ff;
+  --xp-blue-3: #0a84ff;
+  --xp-blue-deep: #0060df;
+  --xp-blue-titlebar-1: #f5f5f7;
+  --xp-blue-titlebar-2: #f5f5f7;
+  --xp-blue-titlebar-3: #f5f5f7;
+
+  --gg-orange: #ff9500;
+  --gg-orange-2: #ffb340;
+  --gg-yellow: #ffcc00;
+  --gg-green: #30d158;
+  --gg-green-light: #4cdf72;
+
+  --text: #1d1d1f;
+  --text-mute: #86868b;
+  --link: #0a84ff;
+  --code-bg: #f0f0f3;
+
+  --shadow-inset-light: none;
+  --shadow-inset-deep: none;
+  --shadow-outset: none;
+  --shadow-inset: none;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "Segoe UI Variable Text", "Segoe UI", system-ui, "Helvetica Neue", sans-serif;
+}
+
+[data-theme="default"] body { color: var(--text); }
+
+/* Cienki, nowoczesny scrollbar */
+[data-theme="default"] ::-webkit-scrollbar { width: 12px; height: 12px; }
+[data-theme="default"] ::-webkit-scrollbar-track { background: transparent; border: none; }
+[data-theme="default"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.22);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+  box-shadow: none;
+}
+[data-theme="default"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
+  background-clip: padding-box;
+}
+[data-theme="default"] ::-webkit-scrollbar-button:single-button {
+  display: none;
+}
+
+/* ── Okno ──────────────────────────────────────────────────────────── */
+[data-theme="default"] .gg-window {
+  background: var(--xp-face-2);
+  border: 1px solid var(--xp-face-line);
+  box-shadow: none;
+}
+
+/* ── Titlebar ──────────────────────────────────────────────────────── */
+[data-theme="default"] .gg-titlebar {
+  height: 40px;
+  background: var(--xp-face);
+  border-bottom: 1px solid var(--xp-face-line);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-shadow: none;
+  padding: 0 6px;
+}
+[data-theme="default"] .gg-titlebar::after { display: none; }
+[data-theme="default"] .gg-titlebar-icon { width: 18px; height: 18px; }
+
+/* Glyphy w ciemnym kolorze (jasny titlebar) */
+[data-theme="default"] .gg-glyph--min {
+  border-bottom-color: var(--text);
+  box-shadow: none;
+}
+[data-theme="default"] .gg-glyph--max {
+  border-color: var(--text);
+  box-shadow: inset 0 0 0 0.5px var(--text);
+}
+[data-theme="default"] .gg-glyph--close::before,
+[data-theme="default"] .gg-glyph--close::after { background: var(--text); }
+
+/* Przyciski okna w stylu Windows 11 — płaskie, po prawej (każdy OS poza mac) */
+[data-theme="default"]:not([data-os="mac"]) .gg-titlebar { padding-right: 0; }
+[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-buttons { gap: 0; }
+[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn {
+  width: 46px;
+  height: 40px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+}
+[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn:hover {
+  background: rgba(0, 0, 0, 0.07);
+}
+[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn:active {
+  background: rgba(0, 0, 0, 0.12);
+}
+[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:hover {
+  background: #e81123;
+}
+[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:active {
+  background: #f1707a;
+}
+[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:hover .gg-glyph--close::before,
+[data-theme="default"]:not([data-os="mac"]) .gg-titlebar-btn--close:hover .gg-glyph--close::after {
+  background: #ffffff;
+}
+
+/* Przyciski okna w stylu macOS — traffic lights, po lewej */
+[data-theme="default"][data-os="mac"] .gg-titlebar {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+[data-theme="default"][data-os="mac"] .gg-titlebar-buttons {
+  order: -1;
+  gap: 8px;
+  margin-right: 14px;
+}
+[data-theme="default"][data-os="mac"] .gg-titlebar-btn {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: #d6d6db;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.14);
+  color: transparent;
+}
+[data-theme="default"][data-os="mac"] .gg-titlebar-btn .gg-glyph { display: none; }
+[data-theme="default"][data-os="mac"] .gg-titlebar-btn--close { order: 1; background: #ff5f57; }
+[data-theme="default"][data-os="mac"] .gg-titlebar-btn--min   { order: 2; background: #febc2e; }
+[data-theme="default"][data-os="mac"] .gg-titlebar-btn--max   { order: 3; background: #28c840; }
+[data-theme="default"][data-os="mac"] .gg-titlebar-btn:hover { filter: brightness(0.92); }
+[data-theme="default"][data-os="mac"] .gg-titlebar-btn:active { filter: brightness(0.82); }
+
+/* ── Menubar ───────────────────────────────────────────────────────── */
+[data-theme="default"] .gg-menubar {
+  background: var(--xp-face-2);
+  border-bottom: 1px solid var(--xp-face-line);
+  color: var(--text);
+}
+[data-theme="default"] .gg-menubar-item:hover,
+[data-theme="default"] .gg-menubar-item.is-open {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text);
+  border-radius: 6px;
+}
+
+/* ── Toolbar ───────────────────────────────────────────────────────── */
+[data-theme="default"] .gg-toolbar {
+  background: var(--xp-face-2);
+  border-bottom: 1px solid var(--xp-face-line);
+}
+[data-theme="default"] .gg-toolbar-btn { border-radius: 8px; }
+[data-theme="default"] .gg-toolbar-btn:hover {
+  border-color: transparent;
+  background: rgba(0, 0, 0, 0.06);
+}
+[data-theme="default"] .gg-toolbar-btn:active { background: rgba(0, 0, 0, 0.1); }
+[data-theme="default"] .gg-toolbar-btn-label { color: var(--text); }
+
+/* ── Sidebar ───────────────────────────────────────────────────────── */
+[data-theme="default"] .gg-sidebar {
+  background: var(--xp-face);
+  border-right: 1px solid var(--xp-face-line);
+}
+[data-theme="default"] .gg-profile { border-bottom-color: var(--xp-face-line); }
+[data-theme="default"] .gg-profile-avatar-frame {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 12px;
+  box-shadow: none;
+}
+[data-theme="default"] .gg-profile-desc {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 6px;
+  box-shadow: none;
+  background: var(--xp-face-2);
+}
+[data-theme="default"] .gg-section { border-bottom-color: var(--xp-face-line); }
+[data-theme="default"] .gg-section-header { background: transparent; }
+[data-theme="default"] .gg-section-toggle {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 4px;
+  background: var(--xp-face-2);
+  color: var(--text);
+}
+[data-theme="default"] .gg-section-title { color: var(--text-mute); }
+[data-theme="default"] .gg-section-action {
+  background: var(--xp-blue-1);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #ffffff;
+}
+[data-theme="default"] .gg-section-action:hover { background: var(--xp-blue-deep); }
+[data-theme="default"] .gg-sidebar-footer { border-top-color: var(--xp-face-line); }
+[data-theme="default"] .gg-sidebar-ad {
+  background: #fff8e6;
+  border: 1px solid #f0e0b0;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+/* Pozycje list — tool / session / friend */
+[data-theme="default"] .gg-tool-item,
+[data-theme="default"] .gg-session-item {
+  border-radius: 6px;
+  margin: 1px 4px;
+}
+[data-theme="default"] .gg-tool-item:hover,
+[data-theme="default"] .gg-session-item:hover,
+[data-theme="default"] .gg-friend-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+[data-theme="default"] .gg-tool-item.is-active,
+[data-theme="default"] .gg-session-item.is-active {
+  background: var(--xp-blue-1);
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+[data-theme="default"] .gg-friend-item { border-bottom-color: var(--xp-face-line); }
+[data-theme="default"] .gg-friend-item.is-active {
+  background: var(--xp-blue-1);
+  color: #ffffff;
+}
+
+/* ── Obszar czatu ──────────────────────────────────────────────────── */
+[data-theme="default"] .gg-main { background: var(--xp-face); }
+[data-theme="default"] .gg-chatwin {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--xp-face-2);
+}
+[data-theme="default"] .gg-chatwin-titlebar {
+  height: 32px;
+  background: var(--xp-face-2);
+  border-bottom: 1px solid var(--xp-face-line);
+  color: var(--text);
+  font-weight: 600;
+  text-shadow: none;
+}
+[data-theme="default"] .gg-chatwin-titlebar::after { display: none; }
+[data-theme="default"] .gg-chatwin-titlebar.is-clickable:hover {
+  filter: none;
+  background: rgba(0, 0, 0, 0.03);
+}
+[data-theme="default"] .gg-chatwin-titlebar-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-mute);
+}
+[data-theme="default"] .gg-chatwin-titlebar-btn:hover { background: rgba(0, 0, 0, 0.06); }
+
+[data-theme="default"] .gg-conversation { background: var(--xp-face-2); }
+[data-theme="default"] .gg-msg-bubble { border-radius: 16px; }
+[data-theme="default"] .gg-msg-bubble--ai {
+  background: #f0f0f3;
+  border: 1px solid transparent;
+  color: var(--text);
+}
+[data-theme="default"] .gg-msg-bubble--user {
+  background: var(--xp-blue-1);
+  border: 1px solid transparent;
+  color: #ffffff;
+}
+[data-theme="default"] .gg-msg--ai .gg-msg-author { color: var(--text-mute); }
+[data-theme="default"] .gg-msg--user .gg-msg-author { color: rgba(255, 255, 255, 0.8); }
+[data-theme="default"] .gg-msg-time { color: var(--text-mute); }
+[data-theme="default"] .gg-msg--user .gg-msg-body strong { color: #ffffff; }
+[data-theme="default"] .gg-msg--user .gg-msg-body a { color: #ffffff; }
+[data-theme="default"] .gg-msg--user .gg-msg-body code {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+/* Bloki kodu */
+[data-theme="default"] .gg-msg-body code {
+  background: var(--code-bg);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 4px;
+}
+[data-theme="default"] .gg-msg-body pre,
+[data-theme="default"] .gg-codeblock {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 8px;
+}
+[data-theme="default"] .gg-codeblock pre { border: none; border-radius: 0; }
+[data-theme="default"] .gg-codeblock-bar {
+  background: var(--xp-face);
+  color: var(--text-mute);
+}
+[data-theme="default"] .gg-copy-btn,
+[data-theme="default"] .gg-msg-copy {
+  background: var(--xp-face-2);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 6px;
+  color: var(--text);
+}
+[data-theme="default"] .gg-msg-image,
+[data-theme="default"] .gg-msg-attachment {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 8px;
+}
+
+/* ── Composer ──────────────────────────────────────────────────────── */
+[data-theme="default"] .gg-composer {
+  background: var(--xp-face-2);
+  border-top: 1px solid var(--xp-face-line);
+}
+[data-theme="default"] .gg-composer-input {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 10px;
+  box-shadow: none;
+  background: var(--xp-face-2);
+}
+[data-theme="default"] .gg-composer-input:focus {
+  border-color: var(--xp-blue-1);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
+}
+[data-theme="default"] .gg-composer-attachments {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 10px;
+  box-shadow: none;
+}
+[data-theme="default"] .gg-attachment {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 8px;
+}
+
+[data-theme="default"] .gg-send-btn {
+  background: var(--gg-orange);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #ffffff;
+  box-shadow: none;
+  font-weight: 600;
+}
+[data-theme="default"] .gg-send-btn:hover { background: #ff8000; }
+[data-theme="default"] .gg-send-btn:active { background: #e67e00; }
+[data-theme="default"] .gg-stop-btn {
+  background: #ff3b30;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  box-shadow: none;
+  text-shadow: none;
+}
+[data-theme="default"] .gg-stop-btn:hover { background: #e0352b; }
+
+/* Macro chips / toggle */
+[data-theme="default"] .gg-macro-chip,
+[data-theme="default"] .gg-macro-toggle {
+  background: var(--xp-face);
+  border: 1px solid var(--xp-face-line);
+  color: var(--text);
+  box-shadow: none;
+}
+[data-theme="default"] .gg-macro-chip:hover:not(:disabled),
+[data-theme="default"] .gg-macro-toggle:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+[data-theme="default"] .gg-macro-toggle.is-active {
+  background: rgba(48, 209, 88, 0.16);
+  border-color: var(--gg-green);
+  color: #1a7a32;
+}
+[data-theme="default"] .gg-macro-row {
+  background: var(--xp-face);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 8px;
+}
+
+/* Emote picker */
+[data-theme="default"] .gg-emote-btn {
+  background: var(--xp-face);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 10px;
+  box-shadow: none;
+  color: var(--text-mute);
+}
+[data-theme="default"] .gg-emote-btn:hover { background: rgba(0, 0, 0, 0.05); }
+[data-theme="default"] .gg-emote-btn.is-open {
+  background: rgba(0, 0, 0, 0.08);
+  box-shadow: none;
+}
+[data-theme="default"] .gg-emote-popover {
+  background: var(--xp-face-2);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+[data-theme="default"] .gg-emote-tabs {
+  background: transparent;
+  border-bottom-color: var(--xp-face-line);
+}
+[data-theme="default"] .gg-emote-tab { border-radius: 6px; }
+[data-theme="default"] .gg-emote-tab.is-active {
+  background: var(--xp-blue-1);
+  border-color: transparent;
+}
+[data-theme="default"] .gg-emote-search {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 6px;
+  background: var(--xp-face-2);
+}
+[data-theme="default"] .gg-emote-cell { border-radius: 8px; }
+[data-theme="default"] .gg-emote-cell:hover {
+  background: rgba(10, 132, 255, 0.12);
+  border-color: transparent;
+}
+
+/* ── Statusbar ─────────────────────────────────────────────────────── */
+[data-theme="default"] .gg-statusbar {
+  background: var(--xp-face);
+  border-top: 1px solid var(--xp-face-line);
+  color: var(--text-mute);
+}
+[data-theme="default"] .gg-statusbar-cell {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+/* ── Modale ────────────────────────────────────────────────────────── */
+[data-theme="default"] .gg-modal-backdrop { background: rgba(0, 0, 0, 0.28); }
+[data-theme="default"] .gg-modal {
+  background: var(--xp-face-2);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+}
+[data-theme="default"] .gg-modal-titlebar {
+  height: 36px;
+  background: var(--xp-face-2);
+  border-bottom: 1px solid var(--xp-face-line);
+  color: var(--text);
+  font-weight: 600;
+  text-shadow: none;
+}
+[data-theme="default"] .gg-modal-tabs { background: transparent; }
+[data-theme="default"] .gg-modal-tab { border-radius: 8px 8px 0 0; }
+[data-theme="default"] .gg-modal-tab.is-active {
+  background: var(--xp-blue-1);
+  border-color: transparent;
+}
+[data-theme="default"] .gg-modal-actions {
+  background: var(--xp-face);
+  border-top: 1px solid var(--xp-face-line);
+}
+[data-theme="default"] .gg-fieldset {
+  background: var(--xp-face);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 10px;
+}
+[data-theme="default"] .gg-text-input {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 8px;
+  box-shadow: none;
+  background: var(--xp-face-2);
+}
+[data-theme="default"] .gg-text-input:focus {
+  border-color: var(--xp-blue-1);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
+}
+[data-theme="default"] .gg-btn,
+[data-theme="default"] .gg-mini-btn {
+  background: var(--xp-face-2);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 8px;
+  box-shadow: none;
+  color: var(--text);
+}
+[data-theme="default"] .gg-btn:hover,
+[data-theme="default"] .gg-mini-btn:hover { background: rgba(0, 0, 0, 0.04); }
+[data-theme="default"] .gg-error {
+  background: #fdecea;
+  border: 1px solid #f3b5af;
+  border-radius: 8px;
+  color: #b3261e;
+}
+
+/* Menu dropdown / newsession */
+[data-theme="default"] .gg-menu-dropdown,
+[data-theme="default"] .gg-newsession-menu {
+  background: var(--xp-face-2);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+}
+[data-theme="default"] .gg-menu-item,
+[data-theme="default"] .gg-newsession-item { border-radius: 6px; }
+[data-theme="default"] .gg-menu-item:hover { background: var(--xp-blue-1); }
+[data-theme="default"] .gg-menu-sep { background: var(--xp-face-line); }
+
+/* Update toast / notice */
+[data-theme="default"] .gg-update-toast,
+[data-theme="default"] .gg-update-notice {
+  background: var(--xp-face-2);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+[data-theme="default"] .gg-update-toast-header {
+  background: var(--xp-face);
+  color: var(--text);
+  border-bottom: 1px solid var(--xp-face-line);
+}
+[data-theme="default"] .gg-update-toast-title { text-shadow: none; }
+[data-theme="default"] .gg-update-toast-notes {
+  background: var(--xp-face);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 6px;
+}
+
+/* Net status / create group / user profile */
+[data-theme="default"] .gg-net-stat {
+  background: var(--xp-face);
+  border: 1px solid var(--xp-face-line);
+  border-radius: 6px;
+}
+[data-theme="default"] .gg-creategroup-list {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 8px;
+}
+[data-theme="default"] .gg-creategroup-row:hover { background: rgba(10, 132, 255, 0.1); }
+[data-theme="default"] .gg-userprofile-avatar {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 14px;
+  box-shadow: none;
+}
+[data-theme="default"] .gg-userprofile-desc {
+  border: 1px solid var(--xp-face-line);
+  border-radius: 8px;
+}

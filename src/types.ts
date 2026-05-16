@@ -122,8 +122,10 @@ export interface Settings {
   macros: Macro[];
   profile: ProfileSettings;
   network: NetworkSettings;
-  /** Motyw aplikacji. "system" śledzi preferencję OS. Default: "light". */
-  theme?: "light" | "dark" | "system";
+  /** Motyw aplikacji. "default" to nowoczesny minimalistyczny look (2026),
+   *  "light"/"dark" to klasyczny XP Luna, "system" śledzi preferencję OS.
+   *  Default: "default". */
+  theme?: "default" | "light" | "dark" | "system";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -138,5 +140,5 @@ export const DEFAULT_SETTINGS: Settings = {
     account_id: null,
     username: null,
   },
-  theme: "light",
+  theme: "default",
 };

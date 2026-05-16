@@ -353,13 +353,24 @@ export default function App() {
     };
   }, []);
 
-  // Theme: ustawiamy data-theme="dark"/"light" na <html>. CSS używa
-  // [data-theme="dark"] selectorów do nadpisania kolorów. Tryb "system"
-  // śledzi preferencję OS (matchMedia).
+  // OS: data-os="mac"/"win"/"other" na <html>. CSS używa tego do natywnych
+  // przycisków okna (traffic lights na macOS, płaskie kontrolki na Windows).
   useEffect(() => {
-    const choice = settings.theme ?? "light";
+    const ua = navigator.userAgent;
+    document.documentElement.dataset.os = /Mac/i.test(ua)
+      ? "mac"
+      : /Win/i.test(ua)
+        ? "win"
+        : "other";
+  }, []);
+
+  // Theme: ustawiamy data-theme="default"/"light"/"dark" na <html>. CSS używa
+  // [data-theme="..."] selectorów do nadpisania kolorów. Tryb "system"
+  // śledzi preferencję OS (matchMedia) i mapuje na klasyczny light/dark.
+  useEffect(() => {
+    const choice = settings.theme ?? "default";
     const apply = () => {
-      let resolved: "light" | "dark";
+      let resolved: "default" | "light" | "dark";
       if (choice === "system") {
         resolved = window.matchMedia("(prefers-color-scheme: dark)").matches
           ? "dark"

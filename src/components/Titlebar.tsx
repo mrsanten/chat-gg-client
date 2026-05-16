@@ -10,14 +10,14 @@ export function Titlebar({ title }: { title: string }) {
       <span className="gg-titlebar-text" data-tauri-drag-region>{title}</span>
       <div className="gg-titlebar-buttons">
         <button
-          className="gg-titlebar-btn"
+          className="gg-titlebar-btn gg-titlebar-btn--min"
           aria-label="Minimalizuj"
           onClick={() => win.minimize()}
         >
           <span className="gg-glyph gg-glyph--min" />
         </button>
         <button
-          className="gg-titlebar-btn"
+          className="gg-titlebar-btn gg-titlebar-btn--max"
           aria-label="Maksymalizuj"
           onClick={() => win.toggleMaximize()}
         >
