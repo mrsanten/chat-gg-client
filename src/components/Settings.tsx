@@ -9,9 +9,16 @@ interface Props {
   onSaved: (s: Settings) => void;
 }
 
+type Tab = "general" | "ai";
+const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
+  { id: "general", label: "Ogólne" },
+  { id: "ai", label: "Konfiguracja AI" },
+];
+
 export function SettingsDialog({ open, onClose, onSaved }: Props) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
+  const [tab, setTab] = useState<Tab>("general");
   const [showAnth, setShowAnth] = useState(false);
   const [showOai, setShowOai] = useState(false);
   const [showMoon, setShowMoon] = useState(false);
@@ -21,6 +28,7 @@ export function SettingsDialog({ open, onClose, onSaved }: Props) {
   useEffect(() => {
     if (!open) return;
     setErr(null);
+    setTab("general");
     loadSettings().then((s) => {
       setSettings(s);
       setLoaded(true);
@@ -107,9 +115,53 @@ export function SettingsDialog({ open, onClose, onSaved }: Props) {
           </div>
         </div>
 
+        <div className="gg-modal-tabs" role="tablist">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              className={`gg-modal-tab${tab === t.id ? " is-active" : ""}`}
+              onClick={() => setTab(t.id)}
+              aria-selected={tab === t.id}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
         <div className="gg-modal-body">
           {!loaded && <div>Ładowanie...</div>}
-          {loaded && (
+          {loaded && tab === "general" && (
+            <fieldset className="gg-fieldset">
+              <legend>Wygląd</legend>
+              <label className="gg-radio">
+                <input
+                  type="radio"
+                  checked={(settings.theme ?? "light") === "light"}
+                  onChange={() => setSettings((s) => ({ ...s, theme: "light" }))}
+                />
+                Jasny (XP Luna)
+              </label>
+              <label className="gg-radio">
+                <input
+                  type="radio"
+                  checked={settings.theme === "dark"}
+                  onChange={() => setSettings((s) => ({ ...s, theme: "dark" }))}
+                />
+                Ciemny
+              </label>
+              <label className="gg-radio">
+                <input
+                  type="radio"
+                  checked={settings.theme === "system"}
+                  onChange={() => setSettings((s) => ({ ...s, theme: "system" }))}
+                />
+                Według systemu
+              </label>
+            </fieldset>
+          )}
+          {loaded && tab === "ai" && (
             <>
               <fieldset className="gg-fieldset">
                 <legend>Anthropic (Claude)</legend>
@@ -327,40 +379,13 @@ export function SettingsDialog({ open, onClose, onSaved }: Props) {
                 )}
               </fieldset>
 
-              <fieldset className="gg-fieldset">
-                <legend>Wygląd</legend>
-                <label className="gg-radio">
-                  <input
-                    type="radio"
-                    checked={(settings.theme ?? "light") === "light"}
-                    onChange={() => setSettings((s) => ({ ...s, theme: "light" }))}
-                  />
-                  Jasny (XP Luna)
-                </label>
-                <label className="gg-radio">
-                  <input
-                    type="radio"
-                    checked={settings.theme === "dark"}
-                    onChange={() => setSettings((s) => ({ ...s, theme: "dark" }))}
-                  />
-                  Ciemny
-                </label>
-                <label className="gg-radio">
-                  <input
-                    type="radio"
-                    checked={settings.theme === "system"}
-                    onChange={() => setSettings((s) => ({ ...s, theme: "system" }))}
-                  />
-                  Według systemu
-                </label>
-              </fieldset>
-
-              {err && <div className="gg-error">{err}</div>}
               <p className="gg-hint">
                 Sekrety zapisywane są lokalnie do pliku konfiguracyjnego apki (plain JSON, nie szyfrowane). Trzymaj komputer u siebie.
               </p>
             </>
           )}
+
+          {err && <div className="gg-error">{err}</div>}
         </div>
 
         <div className="gg-modal-actions">

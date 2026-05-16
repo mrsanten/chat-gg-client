@@ -1546,6 +1546,33 @@ input, textarea {
   font-size: 12px;
 }
 
+.gg-modal-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 0;
+  background: var(--xp-face);
+  border-bottom: 1px solid var(--xp-face-line);
+}
+.gg-modal-tab {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: bold;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  cursor: pointer;
+  color: var(--text);
+}
+.gg-modal-tab:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.gg-modal-tab.is-active {
+  background: var(--xp-blue-1);
+  color: #fff;
+  border-color: var(--xp-blue-deep);
+}
+
 .gg-fieldset {
   border: 1px solid var(--xp-face-shadow);
   padding: 8px 10px;
@@ -2177,6 +2204,10 @@ input, textarea {
 [data-theme="dark"] .gg-modal { background: var(--xp-face); border-color: var(--xp-blue-deep); }
 [data-theme="dark"] .gg-modal-body { color: var(--text); }
 [data-theme="dark"] .gg-modal-actions { background: var(--xp-face); }
+[data-theme="dark"] .gg-modal-tabs { background: var(--xp-face); border-bottom-color: #4a4a52; }
+[data-theme="dark"] .gg-modal-tab { color: var(--text); }
+[data-theme="dark"] .gg-modal-tab:hover { background: rgba(255, 255, 255, 0.08); }
+[data-theme="dark"] .gg-modal-tab.is-active { background: var(--xp-blue-1); color: #fff; }
 
 [data-theme="dark"] .gg-fieldset {
   border-color: #4a4a52;
