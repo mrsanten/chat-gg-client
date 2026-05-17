@@ -3265,8 +3265,9 @@ input, textarea {
   color: var(--text);
 }
 [data-theme^="default"] .gg-rail-ico {
-  font-size: 18px;
-  line-height: 1;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 [data-theme^="default"] .gg-rail-dot {
   position: absolute;
@@ -3548,11 +3549,6 @@ input, textarea {
 [data-theme^="default"] .gg-section-action:hover {
   background: var(--gg-hover);
   color: var(--text);
-}
-
-/* Rail — wymuś monochromatyczne renderowanie glifów (spójne ikony) */
-[data-theme^="default"] .gg-rail-ico {
-  font-variant-emoji: text;
 }
 
 /* Przycisk emotek — czytelniejsza ikona */

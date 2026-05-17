@@ -2251,19 +2251,19 @@ function fmtPeerTime(iso: string): string {
 function peerToChatMessages(list: PeerMessage[], peerUsername: string): ChatMessage[] {
   const modelId = `peer:${peerUsername}`;
   return list.map((m) => {
-    // Dla group messages prefix nadawcy „Nick: " do body, żeby user wiedział
-    // kto pisze (group chat ma N nadawców, nie 1 jak peer chat).
-    const text =
-      m.groupSender && !m.from_me ? `${m.groupSender}: ${m.body}` : m.body;
+    // Group chat ma N nadawców — nick nadawcy idzie do `author` (nagłówek
+    // dymka), nie do treści. Peer chat (1:1) zostawia `author` pusty —
+    // Conversation użyje wtedy nazwy modelu/peera.
     return {
       id: m.id,
       role: m.from_me ? "user" : "assistant",
       modelId,
-      text,
+      text: m.body,
       timestamp: fmtPeerTime(m.created_at),
       streaming: false,
       errored: m.errored,
       e2e: m.e2e,
+      author: m.groupSender && !m.from_me ? m.groupSender : undefined,
     };
   });
 }

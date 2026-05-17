@@ -161,7 +161,9 @@ function Message({
         }}
         title="Prawy przycisk myszy — kopiuj treść"
       >
-        {!isUser && <div className="gg-msg-author">{modelName}</div>}
+        {!isUser && (
+          <div className="gg-msg-author">{msg.author ?? modelName}</div>
+        )}
         {msg.images && msg.images.length > 0 && (
           <div className="gg-msg-attachments">
             {msg.images.map((img, idx) => (

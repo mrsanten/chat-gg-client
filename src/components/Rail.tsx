@@ -17,6 +17,54 @@ interface Props {
   onToggleSidebar?: () => void;
 }
 
+/** Wspólne propsy SVG — spójna, nowoczesna kreska (line-style). */
+const SVG = {
+  className: "gg-rail-ico",
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+const IconMenu = () => (
+  <svg {...SVG}>
+    <path d="M3 6h18M3 12h18M3 18h18" />
+  </svg>
+);
+
+const IconMacros = () => (
+  <svg {...SVG}>
+    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+    <path d="M18 14.5l.8 2.1 2.2.9-2.2.9-.8 2.1-.8-2.1-2.2-.9 2.2-.9z" />
+  </svg>
+);
+
+const IconNetwork = () => (
+  <svg {...SVG}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18" />
+    <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
+  </svg>
+);
+
+const IconSettings = () => (
+  <svg {...SVG}>
+    <circle cx="12" cy="12" r="3.2" />
+    <path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.09a1.7 1.7 0 0 0-1.1-1.56 1.7 1.7 0 0 0-1.87.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.6 14.5 1.7 1.7 0 0 0 3.03 13.5H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.5a1.7 1.7 0 0 0-.34-1.87l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05a1.7 1.7 0 0 0-.34 1.87V8.5a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z" />
+  </svg>
+);
+
+const IconMore = () => (
+  <svg {...SVG} fill="currentColor" stroke="none">
+    <circle cx="12" cy="5" r="1.7" />
+    <circle cx="12" cy="12" r="1.7" />
+    <circle cx="12" cy="19" r="1.7" />
+  </svg>
+);
+
 /**
  * Pionowy pasek akcji (rail) w stylu Discord/Slack. Na mobile reflow do
  * poziomego paska u góry (CSS). Skupia globalne akcje wcześniej rozsiane po
@@ -63,7 +111,7 @@ export function Rail({
           onClick={onToggleSidebar}
           aria-label="Otwórz menu boczne"
         >
-          <span className="gg-rail-ico">☰</span>
+          <IconMenu />
         </button>
       )}
       <div className="gg-rail-logo" aria-hidden>
@@ -79,7 +127,7 @@ export function Rail({
         title="Makra"
         aria-label="Makra"
       >
-        <span className="gg-rail-ico">✦</span>
+        <IconMacros />
       </button>
       <button
         type="button"
@@ -88,7 +136,7 @@ export function Rail({
         title="Sieć Gaidu"
         aria-label="Sieć Gaidu"
       >
-        <span className="gg-rail-ico">⊙</span>
+        <IconNetwork />
         <span
           className={`gg-rail-dot${networkOnline ? " is-online" : ""}`}
           aria-hidden
@@ -101,7 +149,7 @@ export function Rail({
         title="Ustawienia"
         aria-label="Ustawienia"
       >
-        <span className="gg-rail-ico">⚙</span>
+        <IconSettings />
       </button>
 
       <div className="gg-rail-menu" ref={menuRef}>
@@ -112,7 +160,7 @@ export function Rail({
           title="Więcej"
           aria-label="Więcej"
         >
-          <span className="gg-rail-ico">⋯</span>
+          <IconMore />
         </button>
         {menuOpen && (
           <div
