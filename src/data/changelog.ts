@@ -12,6 +12,22 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.14.0",
+    date: "2026-05-17",
+    notes: [
+      "Nowy motyw „Domyślny” w wariancie jasnym i ciemnym — nowoczesny, minimalistyczny look (grafit + niebieski akcent w trybie ciemnym). Stary jasny XP przemianowany na „Doomer Style”, stary ciemny XP usunięty. „Według systemu” przełącza między nowym jasnym a ciemnym.",
+      "Przebudowa układu na rail + lista + panel (styl Discord/Slack): wąski pasek ikon z nawigacją Komunikator / AI / Notatki / Pomodoro, panel użytkownika na dole sidebara, jeden nagłówek czatu. Doomer Style zachowuje klasyczny układ XP (pasek menu, toolbar, statusbar).",
+      "Natywne przyciski okna zależne od systemu: traffic lights na macOS, płaskie kontrolki w stylu Windows 11.",
+      "Nowy moduł Notatki — lokalny notatnik z listą i edytorem, zapisywany na urządzeniu.",
+      "Nowy moduł Pomodoro — timer skupienia z fazami 25/5/15, licznikiem sesji i sygnałem dźwiękowym.",
+      "Wysyłanie obrazów w czatach ze znajomymi i w grupach (wklej obrazek w pole wiadomości).",
+      "Avatary rozmówców widoczne przy wiadomościach; w czatach grupowych nick nadawcy trafia do nagłówka dymka zamiast do treści.",
+      "Ustawienia podzielone na zakładki: Ogólne i Konfiguracja AI.",
+      "Kopiowanie wiadomości prawym przyciskiem myszy; natywne menu kontekstowe zablokowane.",
+      "Poprawki UI: kontrast przycisku wysyłania i niebieskich dymków, czytelniejsze ikony SVG, timestampy przy dymkach, jedna kategoria emotek bez powtórzeń, stonowane podświetlenie aktywnego czatu.",
+    ],
+  },
+  {
     version: "0.13.3",
     date: "2026-05-11",
     notes: [
