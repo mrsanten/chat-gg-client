@@ -3568,3 +3568,10 @@ input, textarea {
 @media (max-width: 768px) {
   [data-theme^="default"] .gg-rail-nav { flex-direction: row; }
 }
+
+/* Avatar nadawcy w wiadomości (czaty peer/grupowe) — zaokrąglone zdjęcie */
+[data-theme^="default"] .gg-msg-avatar-photo {
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--xp-face-2);
+}

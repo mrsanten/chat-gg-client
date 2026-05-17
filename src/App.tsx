@@ -1964,6 +1964,14 @@ export default function App() {
                 messages={peerToChatMessages(
                   groupMessagesByGroup[activeGroupId] ?? [],
                   groups.find((g) => g.id === activeGroupId)?.name ?? "Grupa",
+                  (m) =>
+                    m.groupSender
+                      ? contacts.find(
+                          (c) =>
+                            c.username.toLowerCase() ===
+                            m.groupSender!.toLowerCase(),
+                        )?.avatar
+                      : undefined,
                 )}
                 sessionTitle={(() => {
                   const typing = Array.from(typingByGroup[activeGroupId] ?? []);
@@ -2003,6 +2011,12 @@ export default function App() {
                 messages={peerToChatMessages(
                   peerMessagesByPeer[activePeerUsername] ?? [],
                   activePeerUsername,
+                  () =>
+                    contacts.find(
+                      (c) =>
+                        c.username.toLowerCase() ===
+                        activePeerUsername.toLowerCase(),
+                    )?.avatar,
                 )}
                 sessionTitle={(() => {
                   // Status w nagłówku peer chat odzwierciedla obecność PEERA,
@@ -2273,12 +2287,17 @@ function fmtPeerTime(iso: string): string {
 }
 
 /** Mapuje listę PeerMessage na format ChatMessage używany przez Conversation. */
-function peerToChatMessages(list: PeerMessage[], peerUsername: string): ChatMessage[] {
+function peerToChatMessages(
+  list: PeerMessage[],
+  peerUsername: string,
+  resolveAvatar?: (m: PeerMessage) => string | undefined,
+): ChatMessage[] {
   const modelId = `peer:${peerUsername}`;
   return list.map((m) => {
     // Group chat ma N nadawców — nick nadawcy idzie do `author` (nagłówek
     // dymka), nie do treści. Peer chat (1:1) zostawia `author` pusty —
     // Conversation użyje wtedy nazwy modelu/peera.
+    const avatar = m.from_me ? undefined : resolveAvatar?.(m);
     return {
       id: m.id,
       role: m.from_me ? "user" : "assistant",
@@ -2289,6 +2308,7 @@ function peerToChatMessages(list: PeerMessage[], peerUsername: string): ChatMess
       errored: m.errored,
       e2e: m.e2e,
       author: m.groupSender && !m.from_me ? m.groupSender : undefined,
+      authorAvatar: avatar && avatar.length > 0 ? avatar : undefined,
     };
   });
 }

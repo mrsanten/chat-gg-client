@@ -151,7 +151,12 @@ function Message({
   return (
     <div className={`gg-msg ${isUser ? "gg-msg--user" : "gg-msg--ai"}`}>
       <div className="gg-msg-avatar">
-        {!isUser && <img src={sunIcon} alt="" />}
+        {!isUser &&
+          (msg.authorAvatar ? (
+            <img src={msg.authorAvatar} alt="" className="gg-msg-avatar-photo" />
+          ) : (
+            <img src={sunIcon} alt="" />
+          ))}
       </div>
       <div
         className={`gg-msg-bubble ${isUser ? "gg-msg-bubble--user" : "gg-msg-bubble--ai"}`}

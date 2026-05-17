@@ -25,6 +25,8 @@ export interface ChatMessage {
   e2e?: boolean;
   /** Nick nadawcy — ustawiany dla wiadomości grupowych (czat ma N nadawców). */
   author?: string;
+  /** Avatar nadawcy (data URL) — dla czatów peer/grupowych. Puste → słońce. */
+  authorAvatar?: string;
 }
 
 export interface ChatSession {
