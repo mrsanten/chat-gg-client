@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Titlebar } from "./components/Titlebar";
 import { Rail } from "./components/Rail";
+import { Menubar } from "./components/Menubar";
+import { Toolbar } from "./components/Toolbar";
+import { Statusbar } from "./components/Statusbar";
 import { Sidebar } from "./components/Sidebar";
 import { Conversation } from "./components/Conversation";
 import { Composer } from "./components/Composer";
@@ -1809,25 +1812,60 @@ export default function App() {
     }
   };
 
+  // Doomer Style (theme "light") zachowuje klasyczny układ XP: pasek menu,
+  // toolbar i statusbar. Pozostałe motywy używają nowego układu rail+panel.
+  const classic = (settings.theme ?? "default") === "light";
+
   return (
     <div className="gg-window">
       <Titlebar title="Gaidu" />
+      {classic && (
+        <>
+          <Menubar
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenChangelog={() => setChangelogOpen(true)}
+            onCheckForUpdates={onCheckForUpdates}
+            onLogout={settings.network?.token ? onLogout : undefined}
+            loggedInUsername={settings.network?.username ?? null}
+            onQuit={onQuit}
+          />
+          <Toolbar
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenMacros={() => setMacrosOpen(true)}
+            onOpenNetwork={() => setNetworkOpen(true)}
+            onToggleSidebar={
+              isMobile ? () => setSidebarMobileOpen((v) => !v) : undefined
+            }
+            onAddFriend={() => {
+              if (settings.network?.token) {
+                setAddFriendOpen(true);
+              } else {
+                setNetworkOpen(true);
+              }
+            }}
+            networkOnline={wsStatus.kind === "connected"}
+          />
+        </>
+      )}
       <div className="gg-body">
-        <Rail
-          onOpenSettings={() => setSettingsOpen(true)}
-          onOpenMacros={() => setMacrosOpen(true)}
-          onOpenNetwork={() => setNetworkOpen(true)}
-          onOpenChangelog={() => setChangelogOpen(true)}
-          onCheckForUpdates={onCheckForUpdates}
-          onLogout={settings.network?.token ? onLogout : undefined}
-          loggedInUsername={settings.network?.username ?? null}
-          onQuit={onQuit}
-          networkOnline={wsStatus.kind === "connected"}
-          onToggleSidebar={
-            isMobile ? () => setSidebarMobileOpen((v) => !v) : undefined
-          }
-        />
+        {!classic && (
+          <Rail
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenMacros={() => setMacrosOpen(true)}
+            onOpenNetwork={() => setNetworkOpen(true)}
+            onOpenChangelog={() => setChangelogOpen(true)}
+            onCheckForUpdates={onCheckForUpdates}
+            onLogout={settings.network?.token ? onLogout : undefined}
+            loggedInUsername={settings.network?.username ?? null}
+            onQuit={onQuit}
+            networkOnline={wsStatus.kind === "connected"}
+            onToggleSidebar={
+              isMobile ? () => setSidebarMobileOpen((v) => !v) : undefined
+            }
+          />
+        )}
         <Sidebar
+          classic={classic}
           models={MODELS}
           activeModelId={activeModelId}
           onSelectModel={onSelectModel}
@@ -1867,6 +1905,15 @@ export default function App() {
               ? () => setProfileDialog({ mode: "self" })
               : undefined
           }
+          description={myDescription}
+          onDescriptionChange={
+            settings.network?.token ? onDescriptionChange : undefined
+          }
+          onChangeAvatar={
+            settings.network?.token
+              ? () => setProfileDialog({ mode: "self" })
+              : undefined
+          }
           mobileOpen={isMobile && sidebarMobileOpen}
           onMobileClose={() => setSidebarMobileOpen(false)}
         />
@@ -1874,6 +1921,7 @@ export default function App() {
           {activeGroupId ? (
             <>
               <Conversation
+                classic={classic}
                 model={{
                   id: `group:${activeGroupId}`,
                   name: groups.find((g) => g.id === activeGroupId)?.name ?? "Grupa",
@@ -1912,6 +1960,7 @@ export default function App() {
           ) : activePeerUsername ? (
             <>
               <Conversation
+                classic={classic}
                 model={{
                   id: `peer:${activePeerUsername}`,
                   name: activePeerUsername,
@@ -1984,6 +2033,7 @@ export default function App() {
           ) : (
             <>
               <Conversation
+                classic={classic}
                 model={activeModel}
                 messages={messages}
                 sessionTitle={activeSessionMeta?.title ?? null}
@@ -2001,6 +2051,19 @@ export default function App() {
           )}
         </main>
       </div>
+      {classic && (
+        <Statusbar
+          net={
+            !settings.network?.token
+              ? "logged_out"
+              : wsStatus.kind === "connected"
+                ? "connected"
+                : wsStatus.kind === "connecting" || wsStatus.kind === "reconnecting"
+                  ? "connecting"
+                  : "disconnected"
+          }
+        />
+      )}
       <SettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

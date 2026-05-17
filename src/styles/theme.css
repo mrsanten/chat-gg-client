@@ -3208,14 +3208,17 @@ input, textarea {
    ║  zmiennych), więc działają we wszystkich motywach.                     ║
    ╚══════════════════════════════════════════════════════════════════════╝ */
 
+/* Cały blok jest scope'owany pod [data-theme^="default"] — Doomer Style
+   (data-theme="light") zachowuje klasyczny układ XP bez zmian. */
+
 /* Panel czatu wypełnia .gg-main do krawędzi — bez XP-owej ramki okna. */
-.gg-main {
+[data-theme^="default"] .gg-main {
   padding: 0;
   min-width: 0;
 }
 
 /* ── Rail (pionowy pasek akcji) ──────────────────────────────────────── */
-.gg-rail {
+[data-theme^="default"] .gg-rail {
   width: 56px;
   flex-shrink: 0;
   display: flex;
@@ -3226,7 +3229,7 @@ input, textarea {
   background: var(--xp-face);
   border-right: 1px solid var(--xp-face-line);
 }
-.gg-rail-logo {
+[data-theme^="default"] .gg-rail-logo {
   width: 40px;
   height: 40px;
   display: flex;
@@ -3235,13 +3238,13 @@ input, textarea {
   flex-shrink: 0;
   margin-bottom: 2px;
 }
-.gg-rail-logo img {
+[data-theme^="default"] .gg-rail-logo img {
   width: 32px;
   height: 32px;
   border-radius: 9px;
 }
-.gg-rail-spacer { flex: 1; min-height: 4px; }
-.gg-rail-btn {
+[data-theme^="default"] .gg-rail-spacer { flex: 1; min-height: 4px; }
+[data-theme^="default"] .gg-rail-btn {
   position: relative;
   width: 42px;
   height: 42px;
@@ -3256,16 +3259,16 @@ input, textarea {
   color: var(--text-mute);
   transition: background 0.12s, color 0.12s;
 }
-.gg-rail-btn:hover,
-.gg-rail-btn.is-active {
+[data-theme^="default"] .gg-rail-btn:hover,
+[data-theme^="default"] .gg-rail-btn.is-active {
   background: var(--gg-hover);
   color: var(--text);
 }
-.gg-rail-ico {
+[data-theme^="default"] .gg-rail-ico {
   font-size: 18px;
   line-height: 1;
 }
-.gg-rail-dot {
+[data-theme^="default"] .gg-rail-dot {
   position: absolute;
   right: 7px;
   bottom: 7px;
@@ -3275,32 +3278,32 @@ input, textarea {
   background: #9a9a9a;
   border: 2px solid var(--xp-face);
 }
-.gg-rail-dot.is-online {
+[data-theme^="default"] .gg-rail-dot.is-online {
   background: var(--gg-green);
 }
-.gg-rail-menu { position: relative; }
-.gg-rail-dropdown {
+[data-theme^="default"] .gg-rail-menu { position: relative; }
+[data-theme^="default"] .gg-rail-dropdown {
   position: absolute;
   bottom: 0;
   left: calc(100% + 8px);
   min-width: 210px;
   z-index: 600;
 }
-.gg-rail-hamburger { display: none; }
+[data-theme^="default"] .gg-rail-hamburger { display: none; }
 
 /* ── Sidebar (lista) — kontener przewijany + panel użytkownika ───────── */
-.gg-sidebar-scroll {
+[data-theme^="default"] .gg-sidebar-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
-.gg-sidebar-scroll .gg-sidebar-ad {
+[data-theme^="default"] .gg-sidebar-scroll .gg-sidebar-ad {
   margin: auto 8px 8px;
 }
 
-.gg-userpanel {
+[data-theme^="default"] .gg-userpanel {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -3315,24 +3318,24 @@ input, textarea {
   text-align: left;
   cursor: pointer;
 }
-.gg-userpanel:hover:not(:disabled) { background: var(--gg-hover); }
-.gg-userpanel:disabled { cursor: default; }
-.gg-userpanel-avatar {
+[data-theme^="default"] .gg-userpanel:hover:not(:disabled) { background: var(--gg-hover); }
+[data-theme^="default"] .gg-userpanel:disabled { cursor: default; }
+[data-theme^="default"] .gg-userpanel-avatar {
   position: relative;
   width: 34px;
   height: 34px;
   flex-shrink: 0;
 }
-.gg-userpanel-photo,
-.gg-userpanel-fallback {
+[data-theme^="default"] .gg-userpanel-photo,
+[data-theme^="default"] .gg-userpanel-fallback {
   width: 34px;
   height: 34px;
   border-radius: 10px;
   object-fit: cover;
   background: var(--xp-face-2);
 }
-.gg-userpanel-fallback { padding: 5px; }
-.gg-userpanel-dot {
+[data-theme^="default"] .gg-userpanel-fallback { padding: 5px; }
+[data-theme^="default"] .gg-userpanel-dot {
   position: absolute;
   right: -3px;
   bottom: -3px;
@@ -3342,42 +3345,42 @@ input, textarea {
   border: 2px solid var(--xp-face);
   background: #9a9a9a;
 }
-.gg-userpanel-dot--online { background: var(--gg-green); }
-.gg-userpanel-dot--afk,
-.gg-userpanel-dot--connecting { background: var(--gg-orange); }
-.gg-userpanel-dot--push_reachable { background: var(--gg-orange-2); }
-.gg-userpanel-text {
+[data-theme^="default"] .gg-userpanel-dot--online { background: var(--gg-green); }
+[data-theme^="default"] .gg-userpanel-dot--afk,
+[data-theme^="default"] .gg-userpanel-dot--connecting { background: var(--gg-orange); }
+[data-theme^="default"] .gg-userpanel-dot--push_reachable { background: var(--gg-orange-2); }
+[data-theme^="default"] .gg-userpanel-text {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   line-height: 1.3;
 }
-.gg-userpanel-name {
+[data-theme^="default"] .gg-userpanel-name {
   font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.gg-userpanel-status {
+[data-theme^="default"] .gg-userpanel-status {
   font-size: 11px;
   color: var(--text-mute);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.gg-userpanel-status--online { color: var(--gg-green); }
-.gg-userpanel-status--afk,
-.gg-userpanel-status--connecting { color: var(--gg-orange); }
-.gg-userpanel-ver {
+[data-theme^="default"] .gg-userpanel-status--online { color: var(--gg-green); }
+[data-theme^="default"] .gg-userpanel-status--afk,
+[data-theme^="default"] .gg-userpanel-status--connecting { color: var(--gg-orange); }
+[data-theme^="default"] .gg-userpanel-ver {
   flex-shrink: 0;
   font-size: 10px;
   color: var(--text-mute);
 }
 
 /* ── Nagłówek czatu (jeden, zamiast XP-owego paska tytułu) ───────────── */
-.gg-chat-header {
+[data-theme^="default"] .gg-chat-header {
   flex-shrink: 0;
   height: 50px;
   display: flex;
@@ -3388,28 +3391,28 @@ input, textarea {
   border-bottom: 1px solid var(--xp-face-line);
   color: var(--text);
 }
-.gg-chat-header.is-clickable { cursor: pointer; }
-.gg-chat-header.is-clickable:hover { background: var(--gg-hover); }
-.gg-chat-header-icon--ai {
+[data-theme^="default"] .gg-chat-header.is-clickable { cursor: pointer; }
+[data-theme^="default"] .gg-chat-header.is-clickable:hover { background: var(--gg-hover); }
+[data-theme^="default"] .gg-chat-header-icon--ai {
   width: 26px;
   height: 26px;
   border-radius: 7px;
   flex-shrink: 0;
 }
-.gg-chat-header-text {
+[data-theme^="default"] .gg-chat-header-text {
   display: flex;
   flex-direction: column;
   min-width: 0;
   line-height: 1.3;
 }
-.gg-chat-header-title {
+[data-theme^="default"] .gg-chat-header-title {
   font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.gg-chat-header-sub {
+[data-theme^="default"] .gg-chat-header-sub {
   font-size: 11px;
   color: var(--text-mute);
   white-space: nowrap;
@@ -3419,17 +3422,17 @@ input, textarea {
 
 /* ── Mobile: rail jako poziomy pasek u góry, sidebar = drawer ────────── */
 @media (max-width: 768px) {
-  .gg-body {
+  [data-theme^="default"] .gg-body {
     display: flex;
     flex-direction: column;
   }
-  .gg-main {
+  [data-theme^="default"] .gg-main {
     flex: 1;
     min-height: 0;
     height: auto;
     width: 100%;
   }
-  .gg-rail {
+  [data-theme^="default"] .gg-rail {
     width: 100%;
     height: auto;
     flex-direction: row;
@@ -3439,9 +3442,9 @@ input, textarea {
     padding: 4px 6px;
     padding-top: calc(4px + env(safe-area-inset-top));
   }
-  .gg-rail-spacer { min-height: 0; }
-  .gg-rail-hamburger { display: flex; }
-  .gg-rail-dropdown {
+  [data-theme^="default"] .gg-rail-spacer { min-height: 0; }
+  [data-theme^="default"] .gg-rail-hamburger { display: flex; }
+  [data-theme^="default"] .gg-rail-dropdown {
     bottom: auto;
     left: auto;
     right: 0;

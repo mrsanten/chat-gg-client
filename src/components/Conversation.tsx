@@ -15,6 +15,8 @@ interface Props {
   peerChat?: boolean;
   /** Klik w nagłówek z avatarem peera otwiera profil. */
   onPeerProfileClick?: () => void;
+  /** Doomer Style — klasyczny układ XP (gg-chatwin + pasek tytułu). */
+  classic?: boolean;
 }
 
 export function Conversation({
@@ -25,6 +27,7 @@ export function Conversation({
   peerUnread,
   peerChat,
   onPeerProfileClick,
+  classic,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -51,6 +54,46 @@ export function Conversation({
 
   const headerClickable = !!(peerPresence && onPeerProfileClick);
 
+  const body = (
+    <div className="gg-conversation" ref={ref}>
+      {messages.map((m) => (
+        <Message key={m.id} msg={m} modelName={model.name} emotes={peerChat} />
+      ))}
+    </div>
+  );
+
+  // Doomer Style — klasyczny XP: okno czatu z własnym paskiem tytułu.
+  if (classic) {
+    return (
+      <div className="gg-chatwin">
+        <div
+          className={`gg-chatwin-titlebar${headerClickable ? " is-clickable" : ""}`}
+          onClick={headerClickable ? onPeerProfileClick : undefined}
+          role={headerClickable ? "button" : undefined}
+          title={headerClickable ? "Pokaż profil" : undefined}
+        >
+          {peerPresence ? (
+            <span className="gg-chatwin-titlebar-icon gg-friend-dot-wrap" aria-hidden>
+              <span className={`gg-friend-dot ${presenceClass}`} />
+              {showUnreadBlink && (
+                <span className="gg-friend-dot gg-friend-dot--unread gg-friend-dot--blink" />
+              )}
+            </span>
+          ) : (
+            <img src={sunIcon} alt="" className="gg-chatwin-titlebar-icon" />
+          )}
+          <span className="gg-chatwin-titlebar-text">
+            {model.name}
+            {sessionTitle ? (
+              <span className="gg-chatwin-subtitle"> — {sessionTitle}</span>
+            ) : null}
+          </span>
+        </div>
+        {body}
+      </div>
+    );
+  }
+
   return (
     <>
       <header
@@ -76,11 +119,7 @@ export function Conversation({
           ) : null}
         </div>
       </header>
-      <div className="gg-conversation" ref={ref}>
-        {messages.map((m) => (
-          <Message key={m.id} msg={m} modelName={model.name} emotes={peerChat} />
-        ))}
-      </div>
+      {body}
     </>
   );
 }
