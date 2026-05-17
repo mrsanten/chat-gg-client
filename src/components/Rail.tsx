@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import appIcon from "../assets/app-icon.png";
 
+/** Widoki dostępne z railu. */
+export type RailView = "messenger" | "ai" | "notes" | "pomodoro";
+
 interface Props {
   onOpenSettings: () => void;
   onOpenMacros: () => void;
@@ -13,9 +16,9 @@ interface Props {
   onQuit: () => void;
   /** Czy WebSocket jest aktywny — kropka na ikonie sieci. */
   networkOnline?: boolean;
-  /** Aktywny widok: komunikator (znajomi/grupy) albo AI. */
-  view: "messenger" | "ai";
-  onSelectView: (view: "messenger" | "ai") => void;
+  /** Aktywny widok railu. */
+  view: RailView;
+  onSelectView: (view: RailView) => void;
   /** Mobile: otwórz/zamknij drawer sidebaru. CSS chowa hamburger na desktopie. */
   onToggleSidebar?: () => void;
 }
@@ -71,6 +74,22 @@ const IconAI = () => (
   <svg {...SVG}>
     <circle cx="12" cy="12" r="4" />
     <path d="M12 2v3M12 19v3M19.07 4.93l-2.12 2.12M7.05 16.95l-2.12 2.12M22 12h-3M5 12H2M19.07 19.07l-2.12-2.12M7.05 7.05 4.93 4.93" />
+  </svg>
+);
+
+const IconNotes = () => (
+  <svg {...SVG}>
+    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+    <path d="M14 3v6h6" />
+    <path d="M8 13h8M8 17h6" />
+  </svg>
+);
+
+const IconTimer = () => (
+  <svg {...SVG}>
+    <path d="M10 2h4" />
+    <circle cx="12" cy="14" r="8" />
+    <path d="M12 10v4l2.5 2.5" />
   </svg>
 );
 
@@ -155,6 +174,24 @@ export function Rail({
           aria-label="Czat AI"
         >
           <IconAI />
+        </button>
+        <button
+          type="button"
+          className={`gg-rail-btn gg-rail-navbtn${view === "notes" ? " is-active" : ""}`}
+          onClick={() => onSelectView("notes")}
+          title="Notatki"
+          aria-label="Notatki"
+        >
+          <IconNotes />
+        </button>
+        <button
+          type="button"
+          className={`gg-rail-btn gg-rail-navbtn${view === "pomodoro" ? " is-active" : ""}`}
+          onClick={() => onSelectView("pomodoro")}
+          title="Pomodoro"
+          aria-label="Pomodoro"
+        >
+          <IconTimer />
         </button>
       </div>
 

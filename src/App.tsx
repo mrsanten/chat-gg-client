@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Titlebar } from "./components/Titlebar";
-import { Rail } from "./components/Rail";
+import { Rail, type RailView } from "./components/Rail";
+import { Notes } from "./components/Notes";
+import { Pomodoro } from "./components/Pomodoro";
 import { Menubar } from "./components/Menubar";
 import { Toolbar } from "./components/Toolbar";
 import { Statusbar } from "./components/Statusbar";
@@ -111,8 +113,8 @@ const PENDING_SESSION_KEY = "__pending__";
 export default function App() {
   const isMobile = useMobile();
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
-  // Widok railu: komunikator (znajomi/grupy) vs AI. Steruje sekcjami sidebara.
-  const [railView, setRailView] = useState<"messenger" | "ai">("ai");
+  // Widok railu: komunikator / AI / notatki / pomodoro.
+  const [railView, setRailView] = useState<RailView>("ai");
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [macrosOpen, setMacrosOpen] = useState(false);
@@ -1905,9 +1907,15 @@ export default function App() {
             }
           />
         )}
+        {!classic && railView === "notes" ? (
+          <Notes />
+        ) : !classic && railView === "pomodoro" ? (
+          <Pomodoro />
+        ) : (
+          <>
         <Sidebar
           classic={classic}
-          view={railView}
+          view={railView === "messenger" ? "messenger" : "ai"}
           models={MODELS}
           activeModelId={activeModelId}
           onSelectModel={(id) => {
@@ -2121,6 +2129,8 @@ export default function App() {
             </>
           )}
         </main>
+          </>
+        )}
       </div>
       {classic && (
         <Statusbar
