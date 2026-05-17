@@ -39,6 +39,9 @@ pub enum ClientEvent {
         body: String,
         #[serde(default)]
         client_msg_id: Option<String>,
+        /// Załączone obrazy jako data URL (`data:image/...;base64,...`).
+        #[serde(default)]
+        images: Vec<String>,
     },
     /// Status pisania.
     Typing {
@@ -77,6 +80,9 @@ pub enum ClientEvent {
         body: String,
         #[serde(default)]
         client_msg_id: Option<String>,
+        /// Załączone obrazy jako data URL (`data:image/...;base64,...`).
+        #[serde(default)]
+        images: Vec<String>,
     },
     /// Typing indicator w grupie. Fan-out do wszystkich członków oprócz nadawcy.
     TypingGroup {
@@ -163,6 +169,8 @@ pub enum ServerEvent {
         from: String,
         body: String,
         created_at: DateTime<Utc>,
+        #[serde(default)]
+        images: Vec<String>,
     },
     /// Echo nadawcy: serwer potwierdza, że wiadomość została zapisana.
     /// `body` od v0.13.2 — pozwala innym urządzeniom tego samego usera
@@ -173,6 +181,8 @@ pub enum ServerEvent {
         to: String,
         body: String,
         created_at: DateTime<Utc>,
+        #[serde(default)]
+        images: Vec<String>,
     },
     /// Peer zaczął/skończył pisać.
     Typing {
@@ -217,6 +227,8 @@ pub enum ServerEvent {
         from: String,
         body: String,
         created_at: DateTime<Utc>,
+        #[serde(default)]
+        images: Vec<String>,
     },
     /// Echo nadawcy wiadomości grupowej — analog `Sent` dla peer chat.
     SentGroup {
@@ -225,6 +237,8 @@ pub enum ServerEvent {
         client_msg_id: Option<String>,
         body: String,
         created_at: DateTime<Utc>,
+        #[serde(default)]
+        images: Vec<String>,
     },
     /// Lista kontaktów się zmieniła (add/remove). Klient powinien wywołać
     /// GET /contacts żeby zassać świeży stan.
@@ -429,8 +443,9 @@ async fn handle_client_event(
             group_id,
             body,
             client_msg_id,
+            images,
         } => {
-            if body.is_empty() {
+            if body.is_empty() && images.is_empty() {
                 let _ = tx
                     .send(ServerEvent::Error {
                         code: "empty_body".into(),
@@ -446,6 +461,10 @@ async fn handle_client_event(
                         message: "wiadomość większa niż 64 KiB".into(),
                     })
                     .await;
+                return;
+            }
+            if let Err(err) = validate_images(&images) {
+                let _ = tx.send(err).await;
                 return;
             }
             // Sprawdź że nadawca jest członkiem grupy
@@ -469,14 +488,15 @@ async fn handle_client_event(
             // Insert
             let inserted: Result<(Uuid, DateTime<Utc>), sqlx::Error> = sqlx::query_as(
                 r#"
-                INSERT INTO group_messages (group_id, sender_id, body)
-                VALUES ($1, $2, $3)
+                INSERT INTO group_messages (group_id, sender_id, body, images)
+                VALUES ($1, $2, $3, $4)
                 RETURNING id, created_at
                 "#,
             )
             .bind(group_id)
             .bind(sender_id)
             .bind(&body)
+            .bind(sqlx::types::Json(&images))
             .fetch_one(&state.db)
             .await;
             let (msg_id, created_at) = match inserted {
@@ -503,6 +523,7 @@ async fn handle_client_event(
                         client_msg_id: client_msg_id.clone(),
                         body: body.clone(),
                         created_at,
+                        images: images.clone(),
                     },
                 )
                 .await;
@@ -527,6 +548,7 @@ async fn handle_client_event(
                             from: sender_username.to_string(),
                             body: body.clone(),
                             created_at,
+                            images: images.clone(),
                         },
                     )
                     .await;
@@ -882,8 +904,9 @@ async fn handle_client_event(
             to,
             body,
             client_msg_id,
+            images,
         } => {
-            if body.is_empty() {
+            if body.is_empty() && images.is_empty() {
                 let _ = tx
                     .send(ServerEvent::Error {
                         code: "empty_body".into(),
@@ -899,6 +922,10 @@ async fn handle_client_event(
                         message: "wiadomość większa niż 64 KiB".into(),
                     })
                     .await;
+                return;
+            }
+            if let Err(err) = validate_images(&images) {
+                let _ = tx.send(err).await;
                 return;
             }
             let peer_lower = to.to_lowercase();
@@ -931,14 +958,15 @@ async fn handle_client_event(
 
             let inserted: Result<(Uuid, DateTime<Utc>), sqlx::Error> = sqlx::query_as(
                 r#"
-                INSERT INTO messages (sender_id, recipient_id, body)
-                VALUES ($1, $2, $3)
+                INSERT INTO messages (sender_id, recipient_id, body, images)
+                VALUES ($1, $2, $3, $4)
                 RETURNING id, created_at
                 "#,
             )
             .bind(sender_id)
             .bind(peer_id)
             .bind(&body)
+            .bind(sqlx::types::Json(&images))
             .fetch_one(&state.db)
             .await;
 
@@ -971,6 +999,7 @@ async fn handle_client_event(
                         to: peer_username.clone(),
                         body: body.clone(),
                         created_at,
+                        images: images.clone(),
                     },
                 )
                 .await;
@@ -1005,6 +1034,7 @@ async fn handle_client_event(
                             from: sender_username.to_string(),
                             body,
                             created_at,
+                            images,
                         },
                     )
                     .await;
@@ -1020,6 +1050,36 @@ async fn handle_client_event(
             }
         }
     }
+}
+
+/// Walidacja załączonych obrazów: limit liczby i łącznego rozmiaru oraz
+/// kontrola formatu (data URL). Zwraca `ServerEvent::Error` do odesłania
+/// klientowi gdy walidacja się nie powiedzie.
+fn validate_images(images: &[String]) -> Result<(), ServerEvent> {
+    const MAX_COUNT: usize = 6;
+    const MAX_TOTAL: usize = 12 * 1024 * 1024; // 12 MiB łącznie (base64)
+    if images.len() > MAX_COUNT {
+        return Err(ServerEvent::Error {
+            code: "too_many_images".into(),
+            message: format!("maksymalnie {MAX_COUNT} obrazów"),
+        });
+    }
+    let total: usize = images.iter().map(|s| s.len()).sum();
+    if total > MAX_TOTAL {
+        return Err(ServerEvent::Error {
+            code: "images_too_large".into(),
+            message: "załączone obrazy są za duże".into(),
+        });
+    }
+    for s in images {
+        if !s.starts_with("data:image/") {
+            return Err(ServerEvent::Error {
+                code: "bad_image".into(),
+                message: "nieprawidłowy format obrazu".into(),
+            });
+        }
+    }
+    Ok(())
 }
 
 async fn flush_offline_queue(
@@ -1103,26 +1163,28 @@ async fn flush_offline_queue(
     }
 
     // 3) Plain text messages (legacy z phase 2 — zostają dla starych konwersacji).
-    let rows: Vec<(Uuid, String, String, DateTime<Utc>)> = sqlx::query_as(
-        r#"
-        SELECT m.id, a.username, m.body, m.created_at
+    let rows: Vec<(Uuid, String, String, DateTime<Utc>, sqlx::types::Json<Vec<String>>)> =
+        sqlx::query_as(
+            r#"
+        SELECT m.id, a.username, m.body, m.created_at, m.images
         FROM messages m
         JOIN accounts a ON a.id = m.sender_id
         WHERE m.recipient_id = $1 AND m.delivered_at IS NULL
         ORDER BY m.created_at ASC
         "#,
-    )
-    .bind(account_id)
-    .fetch_all(&state.db)
-    .await?;
+        )
+        .bind(account_id)
+        .fetch_all(&state.db)
+        .await?;
 
-    for (id, from, body, created_at) in rows {
+    for (id, from, body, created_at, images) in rows {
         if tx
             .send(ServerEvent::Message {
                 id,
                 from,
                 body,
                 created_at,
+                images: images.0,
             })
             .await
             .is_err()

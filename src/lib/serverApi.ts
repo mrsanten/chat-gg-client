@@ -51,6 +51,8 @@ export type HistoryEntry =
       body: string;
       created_at: string;
       delivered_at: string | null;
+      /** Załączone obrazy jako data URL (od wersji z obsługą obrazów). */
+      images?: string[];
     }
   | {
       kind: "blob";
@@ -364,6 +366,8 @@ export interface ServerGroupMessage {
   sender_username: string;
   body: string;
   created_at: string;
+  /** Załączone obrazy jako data URL (od wersji z obsługą obrazów). */
+  images?: string[];
 }
 
 /** POST /groups — tworzy grupę, autor staje się adminem. */

@@ -86,3 +86,42 @@ function estimateBytes(dataUrl: string): number {
   const b64 = dataUrl.slice(comma + 1);
   return Math.floor((b64.length * 3) / 4);
 }
+
+// ─────────────────────────────────── Obrazy w wiadomościach
+
+/**
+ * Skaluje obraz z czatu przed wysłaniem do innego usera: maks 1280 px
+ * dłuższy bok, JPEG q=0.8 (PNG zachowane dla przezroczystości). Trzyma
+ * payload WS w ryzach. Zwraca oryginał gdy coś pójdzie nie tak.
+ */
+const MSG_IMG_MAX = 1280;
+const MSG_IMG_QUALITY = 0.8;
+
+export async function compressMessageImage(img: {
+  mimeType: string;
+  base64: string;
+}): Promise<{ mimeType: string; base64: string }> {
+  const srcUrl = `data:${img.mimeType};base64,${img.base64}`;
+  try {
+    const el = await loadImage(srcUrl);
+    const w = el.naturalWidth;
+    const h = el.naturalHeight;
+    const max = Math.max(w, h);
+    const scale = max > MSG_IMG_MAX ? MSG_IMG_MAX / max : 1;
+    const tw = Math.max(1, Math.round(w * scale));
+    const th = Math.max(1, Math.round(h * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = tw;
+    canvas.height = th;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return img;
+    ctx.drawImage(el, 0, 0, tw, th);
+    const mime = img.mimeType === "image/png" ? "image/png" : "image/jpeg";
+    const dataUrl = canvas.toDataURL(mime, MSG_IMG_QUALITY);
+    const comma = dataUrl.indexOf(",");
+    if (comma < 0) return img;
+    return { mimeType: mime, base64: dataUrl.slice(comma + 1) };
+  } catch {
+    return img;
+  }
+}

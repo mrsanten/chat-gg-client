@@ -83,6 +83,7 @@ pub struct GroupMessage {
     pub sender_username: String,
     pub body: String,
     pub created_at: DateTime<Utc>,
+    pub images: sqlx::types::Json<Vec<String>>,
 }
 
 /// POST /groups — utworz grupę. Autor staje się admin-em, member_usernames
@@ -342,7 +343,7 @@ pub async fn group_history(
     let rows: Vec<GroupMessage> = sqlx::query_as(
         r#"
         SELECT gm.id, gm.group_id, gm.sender_id, a.username AS sender_username,
-               gm.body, gm.created_at
+               gm.body, gm.created_at, gm.images
         FROM group_messages gm
         JOIN accounts a ON a.id = gm.sender_id
         WHERE gm.group_id = $1

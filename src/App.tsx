@@ -1073,6 +1073,7 @@ export default function App() {
           body: event.body,
           created_at: event.created_at,
           pending: false,
+          images: wireToImgs(event.images),
         };
         const isNew = !(peerMessagesByPeer[peer] ?? []).some(
           (m) => m.id === msg.id,
@@ -1136,6 +1137,7 @@ export default function App() {
             body: event.body ?? "(wiadomość z innego urządzenia)",
             created_at: event.created_at,
             pending: false,
+            images: wireToImgs(event.images),
           };
           return { ...prev, [peer]: [...cur, msg] };
         });
@@ -1155,6 +1157,7 @@ export default function App() {
           // groupSender hack: zapisujemy username nadawcy w polu które na
           // ekranie pokażemy jako "Nick:" przed treścią.
           groupSender: event.from,
+          images: wireToImgs(event.images),
         };
         const isNew = !(groupMessagesByGroup[gid] ?? []).some(
           (m) => m.id === msg.id,
@@ -1205,6 +1208,7 @@ export default function App() {
             body: event.body ?? "(wiadomość z innego urządzenia)",
             created_at: event.created_at,
             pending: false,
+            images: wireToImgs(event.images),
           };
           return { ...prev, [gid]: [...cur, msg] };
         });
@@ -1442,6 +1446,7 @@ export default function App() {
         created_at: e.created_at,
         pending: false,
         groupSender: e.sender_username,
+        images: wireToImgs(e.images),
       }));
       setGroupMessagesByGroup((prev) => {
         const curNow = prev[groupId] ?? [];
@@ -1472,11 +1477,14 @@ export default function App() {
     void ensureGroupHistoryLoaded(groupId);
   };
 
-  const onGroupSend = (text: string) => {
+  const onGroupSend = async (text: string, images: ImageAttachment[] = []) => {
     const gid = activeGroupId;
     if (!gid || !networkRef.current) return;
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed && images.length === 0) return;
+    const imgs = await compressOutgoingImages(images);
+    const net = networkRef.current;
+    if (!net) return;
     const tmpId = "tmp-" + Math.random().toString(36).slice(2, 10);
     const msg: PeerMessage = {
       id: tmpId,
@@ -1485,16 +1493,18 @@ export default function App() {
       body: trimmed,
       created_at: new Date().toISOString(),
       pending: true,
+      images: imgs.length > 0 ? imgs : undefined,
     };
     setGroupMessagesByGroup((prev) => {
       const cur = prev[gid] ?? [];
       return { ...prev, [gid]: [...cur, msg] };
     });
-    networkRef.current.send({
+    net.send({
       type: "send_group_message",
       group_id: gid,
       body: trimmed,
       client_msg_id: tmpId,
+      images: imgs.length > 0 ? imgsToWire(imgs) : undefined,
     });
   };
 
@@ -1511,7 +1521,16 @@ export default function App() {
     onSelectGroup(created.id);
   };
 
-  const onPeerSend = (text: string) => {
+  // Kompresuje obrazy przed wysłaniem do innego usera (skala 1280 px, JPEG).
+  const compressOutgoingImages = async (
+    images: ImageAttachment[],
+  ): Promise<ImageAttachment[]> => {
+    if (images.length === 0) return [];
+    const { compressMessageImage } = await import("./lib/avatar");
+    return Promise.all(images.map((i) => compressMessageImage(i)));
+  };
+
+  const onPeerSend = async (text: string, images: ImageAttachment[] = []) => {
     // v0.10.0: rip out MLS — wysyłamy plain WS event `send`. Server zapisuje
     // do tabeli `messages` (plain text), peer odbiera przez `message` event.
     // Stare konwersacje MLS (sprzed v0.10.0) dalej działają dwukierunkowo,
@@ -1519,7 +1538,10 @@ export default function App() {
     const peer = activePeerUsername;
     if (!peer || !networkRef.current) return;
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed && images.length === 0) return;
+    const imgs = await compressOutgoingImages(images);
+    const net = networkRef.current;
+    if (!net) return;
     const tmpId = "tmp-" + Math.random().toString(36).slice(2, 10);
     const msg: PeerMessage = {
       id: tmpId,
@@ -1528,16 +1550,18 @@ export default function App() {
       body: trimmed,
       created_at: new Date().toISOString(),
       pending: true,
+      images: imgs.length > 0 ? imgs : undefined,
     };
     setPeerMessagesByPeer((prev) => {
       const cur = prev[peer] ?? [];
       return { ...prev, [peer]: [...cur, msg] };
     });
-    networkRef.current.send({
+    net.send({
       type: "send",
       to: peer,
       body: trimmed,
       client_msg_id: tmpId,
+      images: imgs.length > 0 ? imgsToWire(imgs) : undefined,
     });
   };
 
@@ -1987,7 +2011,7 @@ export default function App() {
                 disabled={false}
                 isStreaming={false}
                 enableEmotes
-                onSend={(text) => onGroupSend(text)}
+                onSend={(text, images) => onGroupSend(text, images)}
                 onTypingChange={(typing) => {
                   if (!activeGroupId || !networkRef.current) return;
                   networkRef.current.send({
@@ -2066,7 +2090,7 @@ export default function App() {
                 disabled={false}
                 isStreaming={false}
                 enableEmotes
-                onSend={(text) => onPeerSend(text)}
+                onSend={(text, images) => onPeerSend(text, images)}
                 onTypingChange={(typing) => {
                   if (!activePeerUsername || !networkRef.current) return;
                   networkRef.current.send({
@@ -2275,6 +2299,24 @@ interface PeerMessage {
   e2e?: boolean;
   /** Tylko dla wiadomości grupowych — username nadawcy (do prefixu „Nick:"). */
   groupSender?: string;
+  /** Załączone obrazy. */
+  images?: ImageAttachment[];
+}
+
+/** ImageAttachment[] → data URL[] — format wire dla wiadomości peer/grupowych. */
+function imgsToWire(images: ImageAttachment[]): string[] {
+  return images.map((i) => `data:${i.mimeType};base64,${i.base64}`);
+}
+
+/** data URL[] → ImageAttachment[]. Pomija wpisy, których nie da się sparsować. */
+function wireToImgs(arr: string[] | undefined): ImageAttachment[] | undefined {
+  if (!arr || arr.length === 0) return undefined;
+  const out: ImageAttachment[] = [];
+  for (const s of arr) {
+    const m = /^data:([^;]+);base64,(.+)$/s.exec(s);
+    if (m) out.push({ mimeType: m[1], base64: m[2] });
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 function fmtPeerTime(iso: string): string {
@@ -2309,6 +2351,7 @@ function peerToChatMessages(
       e2e: m.e2e,
       author: m.groupSender && !m.from_me ? m.groupSender : undefined,
       authorAvatar: avatar && avatar.length > 0 ? avatar : undefined,
+      images: m.images,
     };
   });
 }
@@ -2324,5 +2367,6 @@ function plainEntryToPeer(
     created_at: e.created_at,
     pending: false,
     e2e: false,
+    images: wireToImgs(e.images),
   };
 }

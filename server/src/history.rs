@@ -30,6 +30,7 @@ pub enum HistoryEntry {
         body: String,
         created_at: DateTime<Utc>,
         delivered_at: Option<DateTime<Utc>>,
+        images: Vec<String>,
     },
     Blob {
         id: Uuid,
@@ -53,6 +54,7 @@ struct PlainRow {
     body: String,
     created_at: DateTime<Utc>,
     delivered_at: Option<DateTime<Utc>>,
+    images: sqlx::types::Json<Vec<String>>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -99,7 +101,7 @@ pub async fn history(
     // Plain z `messages` (mogą być legacy). Indeks messages_conv_a/b_idx.
     let plain: Vec<PlainRow> = sqlx::query_as(
         r#"
-        SELECT id, sender_id AS from_id, recipient_id AS to_id, body, created_at, delivered_at
+        SELECT id, sender_id AS from_id, recipient_id AS to_id, body, created_at, delivered_at, images
         FROM messages
         WHERE ((sender_id = $1 AND recipient_id = $2)
             OR (sender_id = $2 AND recipient_id = $1))
@@ -144,6 +146,7 @@ pub async fn history(
             body: r.body,
             created_at: r.created_at,
             delivered_at: r.delivered_at,
+            images: r.images.0,
         });
     }
     for r in blobs {

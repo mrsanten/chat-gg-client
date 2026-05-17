@@ -16,7 +16,14 @@
 export type TypingState = "start" | "stop";
 
 export type ClientEvent =
-  | { type: "send"; to: string; body: string; client_msg_id?: string }
+  | {
+      type: "send";
+      to: string;
+      body: string;
+      client_msg_id?: string;
+      /** Załączone obrazy jako data URL. */
+      images?: string[];
+    }
   | { type: "typing"; to: string; state: TypingState }
   | { type: "ack_delivery"; message_id: string }
   | { type: "ack_blob"; blob_id: string }
@@ -37,6 +44,8 @@ export type ClientEvent =
       group_id: string;
       body: string;
       client_msg_id?: string;
+      /** Załączone obrazy jako data URL. */
+      images?: string[];
     }
   | { type: "typing_group"; group_id: string; state: TypingState };
 
@@ -48,6 +57,7 @@ export type ServerEvent =
       from: string;
       body: string;
       created_at: string;
+      images?: string[];
     }
   | {
       type: "sent";
@@ -58,6 +68,7 @@ export type ServerEvent =
        *  dorzucić outgoing message bez czekania na history refetch. */
       body?: string;
       created_at: string;
+      images?: string[];
     }
   | { type: "typing"; from: string; state: TypingState }
   | {
@@ -99,6 +110,7 @@ export type ServerEvent =
       from: string;
       body: string;
       created_at: string;
+      images?: string[];
     }
   | {
       type: "sent_group";
@@ -107,6 +119,7 @@ export type ServerEvent =
       client_msg_id: string | null;
       body: string;
       created_at: string;
+      images?: string[];
     }
   | { type: "contacts_changed" }
   | { type: "groups_changed" }
