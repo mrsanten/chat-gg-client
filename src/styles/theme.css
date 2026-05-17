@@ -3553,3 +3553,18 @@ input, textarea {
 
 /* Przycisk emotek — czytelniejsza ikona */
 [data-theme^="default"] .gg-emote-btn { font-size: 17px; }
+
+/* Rail — nawigacja widoków (komunikator / AI) pod logo */
+[data-theme^="default"] .gg-rail-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+[data-theme^="default"] .gg-rail-navbtn.is-active {
+  background: var(--gg-hover);
+  color: var(--xp-blue-1);
+}
+@media (max-width: 768px) {
+  [data-theme^="default"] .gg-rail-nav { flex-direction: row; }
+}

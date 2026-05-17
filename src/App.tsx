@@ -111,6 +111,8 @@ const PENDING_SESSION_KEY = "__pending__";
 export default function App() {
   const isMobile = useMobile();
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+  // Widok railu: komunikator (znajomi/grupy) vs AI. Steruje sekcjami sidebara.
+  const [railView, setRailView] = useState<"messenger" | "ai">("ai");
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [macrosOpen, setMacrosOpen] = useState(false);
@@ -1867,6 +1869,13 @@ export default function App() {
             loggedInUsername={settings.network?.username ?? null}
             onQuit={onQuit}
             networkOnline={wsStatus.kind === "connected"}
+            view={railView}
+            onSelectView={(v) => {
+              setRailView(v);
+              // Wybór "AI" przełącza panel główny na czat AI; "komunikator"
+              // tylko odsłania listę znajomych/grup (czat wybiera user).
+              if (v === "ai") onSelectModel(activeModelId);
+            }}
             onToggleSidebar={
               isMobile ? () => setSidebarMobileOpen((v) => !v) : undefined
             }
@@ -1874,14 +1883,24 @@ export default function App() {
         )}
         <Sidebar
           classic={classic}
+          view={railView}
           models={MODELS}
           activeModelId={activeModelId}
-          onSelectModel={onSelectModel}
+          onSelectModel={(id) => {
+            setRailView("ai");
+            onSelectModel(id);
+          }}
           configuredByModel={configuredByModel}
           sessions={sessions}
           activeSessionId={activeSessionId}
-          onSelectSession={onSelectSession}
-          onStartNewSession={onStartNewSession}
+          onSelectSession={(id) => {
+            setRailView("ai");
+            onSelectSession(id);
+          }}
+          onStartNewSession={(id) => {
+            setRailView("ai");
+            onStartNewSession(id);
+          }}
           onDeleteSession={onDeleteSession}
           nick={settings.network?.username ?? undefined}
           presence={
@@ -1898,13 +1917,19 @@ export default function App() {
           networkLoggedIn={!!settings.network.token && !!settings.network.username}
           contacts={contacts}
           activePeerUsername={activePeerUsername}
-          onSelectPeer={onSelectPeer}
+          onSelectPeer={(u) => {
+            setRailView("messenger");
+            onSelectPeer(u);
+          }}
           onAddFriend={() => setAddFriendOpen(true)}
           onRemoveFriend={onRemoveFriend}
           unreadByPeer={unreadByPeer}
           groups={groups}
           activeGroupId={activeGroupId}
-          onSelectGroup={onSelectGroup}
+          onSelectGroup={(id) => {
+            setRailView("messenger");
+            onSelectGroup(id);
+          }}
           onCreateGroup={() => setCreateGroupOpen(true)}
           unreadByGroup={unreadByGroup}
           avatar={myAvatar}

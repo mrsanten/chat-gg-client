@@ -41,6 +41,9 @@ interface Props {
   onOpenProfile?: () => void;
   /** Doomer Style — klasyczny układ XP (profil u góry zamiast panelu na dole). */
   classic?: boolean;
+  /** Widok railu: "messenger" pokazuje znajomych i grupy, "ai" — narzędzia
+   *  i historię. W trybie classic ignorowane (wszystkie sekcje widoczne). */
+  view?: "messenger" | "ai";
   /** Opis profilu — edytowalny input w klasycznym układzie. */
   description?: string;
   onDescriptionChange?: (description: string) => void;
@@ -81,6 +84,7 @@ export function Sidebar(props: Props) {
     avatar,
     onOpenProfile,
     classic,
+    view,
     description,
     onDescriptionChange,
     onChangeAvatar,
@@ -129,7 +133,7 @@ export function Sidebar(props: Props) {
 
   const sections = (
     <>
-      {networkLoggedIn && (
+      {(classic || view === "messenger") && networkLoggedIn && (
         <Section
           title="Znajomi"
           count={contacts && contacts.length > 0 ? `(${contacts.filter((c) => c.online).length}/${contacts.length})` : undefined}
@@ -216,7 +220,7 @@ export function Sidebar(props: Props) {
         </Section>
       )}
 
-      {networkLoggedIn && (
+      {(classic || view === "messenger") && networkLoggedIn && (
         <Section
           title="Grupy"
           count={groups && groups.length > 0 ? `(${groups.length})` : undefined}
@@ -276,6 +280,7 @@ export function Sidebar(props: Props) {
         </Section>
       )}
 
+      {(classic || view === "ai") && (
       <Section
         title="Narzędzia (CLI)"
         open={openTools}
@@ -294,8 +299,9 @@ export function Sidebar(props: Props) {
           <span className="gg-tool-item-name">AI Chat</span>
         </div>
       </Section>
+      )}
 
-      {!activePeerUsername && !activeGroupId && (
+      {(classic || view === "ai") && !activePeerUsername && !activeGroupId && (
       <Section
         title="Historia"
         open={openHistory}

@@ -13,6 +13,9 @@ interface Props {
   onQuit: () => void;
   /** Czy WebSocket jest aktywny — kropka na ikonie sieci. */
   networkOnline?: boolean;
+  /** Aktywny widok: komunikator (znajomi/grupy) albo AI. */
+  view: "messenger" | "ai";
+  onSelectView: (view: "messenger" | "ai") => void;
   /** Mobile: otwórz/zamknij drawer sidebaru. CSS chowa hamburger na desktopie. */
   onToggleSidebar?: () => void;
 }
@@ -52,8 +55,22 @@ const IconNetwork = () => (
 
 const IconSettings = () => (
   <svg {...SVG}>
-    <circle cx="12" cy="12" r="3.2" />
-    <path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.09a1.7 1.7 0 0 0-1.1-1.56 1.7 1.7 0 0 0-1.87.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.6 14.5 1.7 1.7 0 0 0 3.03 13.5H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.5a1.7 1.7 0 0 0-.34-1.87l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05a1.7 1.7 0 0 0-.34 1.87V8.5a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z" />
+    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const IconMessenger = () => (
+  <svg {...SVG}>
+    <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" />
+    <path d="M8 12h.01M12 12h.01M16 12h.01" />
+  </svg>
+);
+
+const IconAI = () => (
+  <svg {...SVG}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v3M12 19v3M19.07 4.93l-2.12 2.12M7.05 16.95l-2.12 2.12M22 12h-3M5 12H2M19.07 19.07l-2.12-2.12M7.05 7.05 4.93 4.93" />
   </svg>
 );
 
@@ -81,6 +98,8 @@ export function Rail({
   loggedInUsername,
   onQuit,
   networkOnline,
+  view,
+  onSelectView,
   onToggleSidebar,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -116,6 +135,27 @@ export function Rail({
       )}
       <div className="gg-rail-logo" aria-hidden>
         <img src={appIcon} alt="" />
+      </div>
+
+      <div className="gg-rail-nav">
+        <button
+          type="button"
+          className={`gg-rail-btn gg-rail-navbtn${view === "messenger" ? " is-active" : ""}`}
+          onClick={() => onSelectView("messenger")}
+          title="Komunikator — znajomi i grupy"
+          aria-label="Komunikator"
+        >
+          <IconMessenger />
+        </button>
+        <button
+          type="button"
+          className={`gg-rail-btn gg-rail-navbtn${view === "ai" ? " is-active" : ""}`}
+          onClick={() => onSelectView("ai")}
+          title="Czat AI"
+          aria-label="Czat AI"
+        >
+          <IconAI />
+        </button>
       </div>
 
       <div className="gg-rail-spacer" />
