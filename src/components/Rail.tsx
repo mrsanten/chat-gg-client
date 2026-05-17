@@ -88,7 +88,7 @@ export function Rail({
         title="Sieć Gaidu"
         aria-label="Sieć Gaidu"
       >
-        <span className="gg-rail-ico">🌐</span>
+        <span className="gg-rail-ico">⊙</span>
         <span
           className={`gg-rail-dot${networkOnline ? " is-online" : ""}`}
           aria-hidden

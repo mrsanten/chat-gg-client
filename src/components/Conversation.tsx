@@ -136,7 +136,9 @@ function Message({
   const isUser = msg.role === "user";
   const [copied, setCopied] = useState(false);
 
+  const canCopy = !msg.streaming && msg.text.trim().length > 0;
   const onCopyMessage = async () => {
+    if (!canCopy) return;
     try {
       await navigator.clipboard.writeText(msg.text);
       setCopied(true);
@@ -146,14 +148,19 @@ function Message({
     }
   };
 
-  const showCopy = !msg.streaming && msg.text.trim().length > 0;
-
   return (
     <div className={`gg-msg ${isUser ? "gg-msg--user" : "gg-msg--ai"}`}>
       <div className="gg-msg-avatar">
         {!isUser && <img src={sunIcon} alt="" />}
       </div>
-      <div className={`gg-msg-bubble ${isUser ? "gg-msg-bubble--user" : "gg-msg-bubble--ai"}`}>
+      <div
+        className={`gg-msg-bubble ${isUser ? "gg-msg-bubble--user" : "gg-msg-bubble--ai"}`}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          void onCopyMessage();
+        }}
+        title="Prawy przycisk myszy — kopiuj treść"
+      >
         {!isUser && <div className="gg-msg-author">{modelName}</div>}
         {msg.images && msg.images.length > 0 && (
           <div className="gg-msg-attachments">
@@ -168,16 +175,7 @@ function Message({
           </div>
         )}
         <MessageBody text={msg.text} streaming={msg.streaming} emotes={emotes} />
-        {showCopy && (
-          <button
-            type="button"
-            className="gg-msg-copy"
-            onClick={onCopyMessage}
-            title="Kopiuj treść"
-          >
-            {copied ? "Skopiowano" : "Kopiuj"}
-          </button>
-        )}
+        {copied && <span className="gg-msg-copied">Skopiowano</span>}
       </div>
       <span className="gg-msg-time">
         {msg.e2e && (

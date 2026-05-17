@@ -3284,6 +3284,7 @@ input, textarea {
 [data-theme^="default"] .gg-rail-menu { position: relative; }
 [data-theme^="default"] .gg-rail-dropdown {
   position: absolute;
+  top: auto;
   bottom: 0;
   left: calc(100% + 8px);
   min-width: 210px;
@@ -3451,3 +3452,108 @@ input, textarea {
     top: calc(100% + 6px);
   }
 }
+
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║   POPRAWKI UI — kontrast, wyrównanie, ikony (motywy default/-dark)     ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+
+/* Modale — mniej zaokrąglone */
+[data-theme^="default"] .gg-modal { border-radius: 10px; }
+
+/* Przycisk Wyślij — niebieski akcent (lepszy kontrast niż biały na pomarańczu) */
+[data-theme^="default"] .gg-send-btn {
+  background: var(--xp-blue-1);
+  color: #ffffff;
+}
+[data-theme^="default"] .gg-send-btn:hover {
+  background: var(--xp-blue-1);
+  filter: brightness(1.1);
+}
+[data-theme^="default"] .gg-send-btn:active {
+  background: var(--xp-blue-1);
+  filter: brightness(0.9);
+}
+
+/* Niebieskie dymki użytkownika — ciemniejszy niebieski dla kontrastu z bielą */
+[data-theme^="default"] .gg-msg-bubble--user { background: #0a64d0; }
+
+/* Timestampy — w przepływie, przy dymku, stonowane (zamiast oderwanego rogu) */
+[data-theme^="default"] .gg-msg-time {
+  position: static;
+  align-self: flex-end;
+  font-size: 10px;
+  color: var(--text-mute);
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+
+/* Kopiowanie wiadomości — badge po kliknięciu PPM (przycisk Kopiuj usunięty) */
+.gg-msg-copied {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--text);
+  color: var(--xp-face-2);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 7px;
+  pointer-events: none;
+}
+
+/* Pozycje list — jednolite wcięcie (AI Chat = znajomi = grupy = sesje) */
+[data-theme^="default"] .gg-tool-item,
+[data-theme^="default"] .gg-session-item,
+[data-theme^="default"] .gg-friend-item {
+  margin: 1px 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border-bottom: none;
+}
+
+/* Aktywny czat — stonowany, przyjazny akcent zamiast pełnego niebieskiego */
+[data-theme^="default"] .gg-tool-item.is-active,
+[data-theme^="default"] .gg-session-item.is-active,
+[data-theme^="default"] .gg-friend-item.is-active {
+  background: rgba(10, 132, 255, 0.16);
+  color: var(--text);
+}
+[data-theme^="default"] .gg-session-item.is-active .gg-session-time {
+  color: var(--text-mute);
+}
+[data-theme^="default"] .gg-session-item.is-active .gg-session-model-badge {
+  background: var(--xp-face-line);
+  color: var(--text-mute);
+}
+[data-theme^="default"] .gg-friend-item.is-active .gg-friend-desc {
+  color: var(--text-mute);
+}
+
+/* Akcje sekcji (+ Dodaj/Nowa/Nowy) — kompaktowy przycisk-ikona */
+[data-theme^="default"] .gg-section-action {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-mute);
+}
+[data-theme^="default"] .gg-section-action:hover {
+  background: var(--gg-hover);
+  color: var(--text);
+}
+
+/* Rail — wymuś monochromatyczne renderowanie glifów (spójne ikony) */
+[data-theme^="default"] .gg-rail-ico {
+  font-variant-emoji: text;
+}
+
+/* Przycisk emotek — czytelniejsza ikona */
+[data-theme^="default"] .gg-emote-btn { font-size: 17px; }

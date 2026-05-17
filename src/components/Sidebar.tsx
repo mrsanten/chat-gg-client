@@ -144,8 +144,9 @@ export function Sidebar(props: Props) {
                 onAddFriend?.();
               }}
               title="Dodaj znajomego po username"
+              aria-label="Dodaj znajomego"
             >
-              + Dodaj
+              {classic ? "+ Dodaj" : "+"}
             </button>
           }
         >
@@ -231,8 +232,9 @@ export function Sidebar(props: Props) {
                   onCreateGroup();
                 }}
                 title="Utwórz nową grupę"
+                aria-label="Nowa grupa"
               >
-                + Nowa
+                {classic ? "+ Nowa" : "+"}
               </button>
             ) : null
           }
@@ -301,6 +303,7 @@ export function Sidebar(props: Props) {
         scroll={classic}
         action={
           <NewSessionMenu
+            classic={classic}
             models={models}
             configuredByModel={configuredByModel}
             onPick={(modelId) => {
@@ -476,10 +479,12 @@ function NewSessionMenu({
   models,
   configuredByModel,
   onPick,
+  classic,
 }: {
   models: ToolModel[];
   configuredByModel: Record<string, boolean>;
   onPick: (modelId: string) => void;
+  classic?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -501,8 +506,9 @@ function NewSessionMenu({
           setOpen((v) => !v);
         }}
         title="Nowa rozmowa"
+        aria-label="Nowa rozmowa"
       >
-        + Nowy
+        {classic ? "+ Nowy" : "+"}
       </button>
       {open && (
         <div className="gg-newsession-menu" onClick={(e) => e.stopPropagation()}>

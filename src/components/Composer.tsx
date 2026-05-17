@@ -249,8 +249,8 @@ export function Composer({
           onPaste={onPaste}
           placeholder={
             images.length > 0
-              ? "Dodaj komentarz albo wyślij sam obrazek..."
-              : "Cmd+V żeby wkleić obrazek..."
+              ? "Dodaj podpis (opcjonalnie)…"
+              : "Napisz wiadomość…"
           }
         />
         {enableEmotes && !isStreaming && (
@@ -263,7 +263,7 @@ export function Composer({
             aria-label="Emotki"
             aria-expanded={emotePickerOpen}
           >
-            <span aria-hidden>:‑)</span>
+            <span aria-hidden>🙂</span>
           </button>
         )}
         {isStreaming ? (

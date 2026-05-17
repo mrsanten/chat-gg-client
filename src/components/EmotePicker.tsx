@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { EMOTES, EMOTES_BY_CATEGORY } from "../data/emotes";
+import { EMOTES } from "../data/emotes";
 
 interface Props {
   open: boolean;
@@ -10,15 +10,24 @@ interface Props {
   onPick: (trigger: string) => void;
 }
 
-type Tab = "1" | "2" | "3";
-const TABS: ReadonlyArray<{ id: Tab; label: string }> = [
-  { id: "1", label: "GG7 cz.1" },
-  { id: "2", label: "GG7 cz.2" },
-  { id: "3", label: "GG7 cz.3" },
-];
+/**
+ * Jedna lista emotek bez powtórzeń. GG7 cz.1/2/3 zawierają te same emotki
+ * w różnych folderach — deduplikujemy po nazwie pliku, zostawiając pierwszy
+ * (alfabetycznie) trigger dla danej grafiki.
+ */
+const UNIQUE_TRIGGERS: readonly string[] = (() => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const trigger of Object.keys(EMOTES).sort()) {
+    const file = EMOTES[trigger].replace(/^[^/]+\//, "");
+    if (seen.has(file)) continue;
+    seen.add(file);
+    out.push(trigger);
+  }
+  return out;
+})();
 
 export function EmotePicker({ open, anchor, onClose, onPick }: Props) {
-  const [tab, setTab] = useState<Tab>("1");
   const [filter, setFilter] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
@@ -51,33 +60,16 @@ export function EmotePicker({ open, anchor, onClose, onPick }: Props) {
 
   const q = filter.trim().toLowerCase();
   const triggers = q
-    ? Object.keys(EMOTES)
-        .filter((t) => t.toLowerCase().includes(q))
-        .sort()
-    : [...EMOTES_BY_CATEGORY[tab]];
+    ? UNIQUE_TRIGGERS.filter((t) => t.toLowerCase().includes(q))
+    : UNIQUE_TRIGGERS;
 
   return (
     <div className="gg-emote-popover" ref={ref} role="dialog" aria-label="Emotki">
-      <div className="gg-emote-tabs" role="tablist">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            className={`gg-emote-tab${tab === t.id && !q ? " is-active" : ""}`}
-            onClick={() => {
-              setTab(t.id);
-              setFilter("");
-            }}
-            aria-selected={tab === t.id && !q}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="gg-emote-tabs">
         <input
           type="text"
           className="gg-emote-search"
-          placeholder="szukaj…"
+          placeholder="szukaj emotki…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />

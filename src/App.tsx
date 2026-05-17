@@ -365,6 +365,14 @@ export default function App() {
         : "other";
   }, []);
 
+  // Blokada natywnego menu kontekstowego (prawy przycisk myszy). Wiadomości
+  // mają własną obsługę prawego przycisku (kopiowanie) na poziomie komponentu.
+  useEffect(() => {
+    const block = (e: MouseEvent) => e.preventDefault();
+    document.addEventListener("contextmenu", block);
+    return () => document.removeEventListener("contextmenu", block);
+  }, []);
+
   // Theme: ustawiamy data-theme="default"/"default-dark"/"light" na <html>.
   // CSS używa [data-theme^="default"] / [data-theme="..."] do kolorów.
   // "system" śledzi preferencję OS i przełącza nowy jasny/ciemny. Stary XP
