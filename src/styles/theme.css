@@ -2027,6 +2027,17 @@ input, textarea {
   text-align: center;
 }
 
+/* Link-owy przycisk w banerze offline (np. „Zaloguj się" gdy serwer wróci). */
+.gg-net-offline-banner-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* Friend item z opisem (rozszerzona wersja gg-session-item) */
 .gg-friend-item {
   display: flex;

@@ -16,6 +16,13 @@ interface Props {
   netStats?: NetworkStats;
   onClose: () => void;
   onSaved: (s: Settings) => void;
+  /**
+   * Wyjście awaryjne z trybu wymuszonego: serwer nie odpowiada, więc nie ma
+   * gdzie się zalogować. Pokazujemy przycisk dopiero po nieudanej próbie
+   * z błędem sieciowym: boot probe (/healthz) łapie zwykły przypadek, a ten
+   * przycisk ratuje sytuację gdy serwer padnie między probe a logowaniem.
+   */
+  onOfflineFallback?: () => void;
 }
 
 type Mode = "login" | "register";
@@ -28,6 +35,7 @@ export function NetworkAccountDialog({
   netStats,
   onClose,
   onSaved,
+  onOfflineFallback,
 }: Props) {
   const [mode, setMode] = useState<Mode>("login");
   const [username, setUsername] = useState("");
@@ -35,6 +43,8 @@ export function NetworkAccountDialog({
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  /** Ostatnia próba padła na braku łączności, proponujemy tryb lokalny. */
+  const [serverDown, setServerDown] = useState(false);
 
   const serverUrl = PRODUCTION_SERVER_URL;
 
@@ -45,6 +55,7 @@ export function NetworkAccountDialog({
     setPassword("");
     setShowPassword(false);
     setErr(null);
+    setServerDown(false);
   }, [open]);
 
   if (!open) return null;
@@ -82,6 +93,9 @@ export function NetworkAccountDialog({
       await persistAuth(resp, password);
       onClose();
     } catch (e) {
+      // Serwer padł (brak łączności albo 5xx z origin/Cloudflare), nie ma
+      // sensu kazać userowi próbować dalej, proponujemy tryb lokalny.
+      setServerDown(serverApi.isServerDown(e));
       const msg =
         e instanceof serverApi.ServerError
           ? e.code === "unauthorized"
@@ -200,6 +214,13 @@ export function NetworkAccountDialog({
               </fieldset>
 
               {err && <div className="gg-error">{err}</div>}
+              {serverDown && (
+                <p className="gg-hint">
+                  Serwer nie odpowiada. Możesz pracować lokalnie: chaty AI,
+                  Notatki i Pomodoro działają bez konta. Rozmowy ze znajomymi
+                  wrócą po zalogowaniu, gdy sieć wstanie.
+                </p>
+              )}
             </>
           )}
         </div>
@@ -214,6 +235,16 @@ export function NetworkAccountDialog({
               {!forced && (
                 <button type="button" className="gg-btn" onClick={onClose} disabled={busy}>
                   Anuluj
+                </button>
+              )}
+              {serverDown && onOfflineFallback && (
+                <button
+                  type="button"
+                  className="gg-btn"
+                  onClick={onOfflineFallback}
+                  disabled={busy}
+                >
+                  Pracuj offline
                 </button>
               )}
               <button type="button" className="gg-send-btn" onClick={submit} disabled={busy}>

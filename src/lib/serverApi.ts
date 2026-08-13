@@ -77,6 +77,19 @@ export class ServerError extends Error {
   }
 }
 
+/**
+ * Czy błąd oznacza „serwer nie działa", a nie „żądanie było złe"?
+ *
+ * - status 0:   fetch nie doszedł (brak sieci, DNS, TLS, connection refused)
+ * - status 5xx: origin padł. Cloudflare przed nami zwraca własne 52x/53x
+ *   (np. 530 gdy origin nie odpowiada), więc sam status 0 tego nie łapie.
+ *
+ * Używane do decyzji „nie wymagaj logowania, wpuść w tryb lokalny".
+ */
+export function isServerDown(e: unknown): boolean {
+  return e instanceof ServerError && (e.status === 0 || e.status >= 500);
+}
+
 function trimUrl(url: string): string {
   return url.replace(/\/+$/, "");
 }

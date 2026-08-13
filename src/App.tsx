@@ -110,6 +110,9 @@ function messagesToStored(messages: ChatMessage[]): ChatSession["messages"] {
 
 const PENDING_SESSION_KEY = "__pending__";
 
+/** Co ile dopytujemy /healthz gdy siedzimy w trybie `offline_guest`. */
+const GUEST_HEALTH_RETRY_MS = 30_000;
+
 export default function App() {
   const isMobile = useMobile();
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
@@ -122,15 +125,27 @@ export default function App() {
   const [networkOpen, setNetworkOpen] = useState(false);
   /**
    * Stan boot-a sieci. Ustawiamy w useEffect po sprawdzeniu tokena.
-   * - loading            — w trakcie sprawdzania
-   * - needs_login        — token brak / nieważny, wymagaj logowania
-   * - logged_in          — token OK, jesteśmy w sieci
-   * - server_unreachable — server padł, ale token jest; tryb degradowany
-   *                        (apka działa, ale tylko AI chats, peer disabled)
+   * - loading:            w trakcie sprawdzania
+   * - needs_login:        token brak / nieważny, a serwer ODPOWIADA, więc
+   *                       wymagamy logowania (modal blokujący)
+   * - logged_in:          token OK, jesteśmy w sieci
+   * - server_unreachable: server padł, ale token jest; tryb degradowany
+   *                       (apka działa, ale tylko AI chats, peer disabled)
+   * - offline_guest:      server padł I nie mamy tokena. Logowania NIE
+   *                       wymagamy: apka wchodzi w tryb lokalny (AI, Notatki,
+   *                       Pomodoro). Blokada modalem przy martwym serwerze
+   *                       znaczyłaby, że apki nie da się w ogóle otworzyć.
    */
   const [netBootState, setNetBootState] = useState<
-    "loading" | "needs_login" | "logged_in" | "server_unreachable"
+    | "loading"
+    | "needs_login"
+    | "logged_in"
+    | "server_unreachable"
+    | "offline_guest"
   >("loading");
+  /** W trybie `offline_guest`: serwer wrócił, można się zalogować. Nie
+   *  wrzucamy modala sami, bo user może być w środku pisania notatki. */
+  const [guestServerBack, setGuestServerBack] = useState(false);
   const [addFriendOpen, setAddFriendOpen] = useState(false);
   const [contacts, setContacts] = useState<ServerContact[]>([]);
   const [groups, setGroups] = useState<serverApi.ServerGroup[]>([]);
@@ -219,6 +234,20 @@ export default function App() {
     ? messagesBySession[activeSessionId] ?? []
     : [welcomeMessage(activeModel, settings)];
 
+  /**
+   * Wybierz stan boot-a dla sytuacji „nie mamy ważnego tokena".
+   *
+   * Serwer odpowiada na /healthz: `needs_login` (modal blokujący, jak dotąd).
+   * Serwer milczy: `offline_guest`, czyli wymaganie logowania znika, bo nie ma
+   * się gdzie zalogować. Apka startuje w trybie lokalnym zamiast wisieć na
+   * modalu, którego nie da się przejść.
+   */
+  const resolveLoggedOutState = async (serverUrl: string) => {
+    const reachable = await serverApi.healthz(serverUrl);
+    setGuestServerBack(false);
+    setNetBootState(reachable ? "needs_login" : "offline_guest");
+  };
+
   useEffect(() => {
     (async () => {
       // listSessions() bez tokenu zwraca lokalne sesje (Tauri local file —
@@ -296,7 +325,7 @@ export default function App() {
                   const settingsLib = await import("./lib/settings");
                   await settingsLib.saveSettings(cleared);
                   setSettings(cleared);
-                  setNetBootState("needs_login");
+                  await resolveLoggedOutState(s.network.server_url);
                 } else {
                   // Network error przy auto-relogin → server down.
                   console.info("[network] auto-relogin: server unreachable, tryb degradowany");
@@ -311,7 +340,7 @@ export default function App() {
               const settingsLib = await import("./lib/settings");
               await settingsLib.saveSettings(cleared);
               setSettings(cleared);
-              setNetBootState("needs_login");
+              await resolveLoggedOutState(s.network.server_url);
             }
           } else {
             // Serwer down — degraded mode.
@@ -320,7 +349,7 @@ export default function App() {
           }
         }
       } else {
-        setNetBootState("needs_login");
+        await resolveLoggedOutState(s.network.server_url);
       }
     })();
     // Sprawdź aktualizacje w tle przy starcie + co 5 minut + przy powrocie
@@ -780,7 +809,8 @@ export default function App() {
     if (!s.network.token) {
       setContacts([]);
       setActivePeerUsername(null);
-      setNetBootState("needs_login");
+      // Wylogowanie przy martwym serwerze też nie może zablokować apki.
+      void resolveLoggedOutState(s.network.server_url);
     } else {
       void refreshContacts(s.network.server_url, s.network.token);
       void refreshGroups(s.network.server_url, s.network.token);
@@ -919,6 +949,24 @@ export default function App() {
     }
   };
 
+  // W trybie `offline_guest` dopytujemy serwer w tle. Kiedy wróci, NIE
+  // wrzucamy modala logowania na siłę, bo user może być w środku pisania
+  // notatki. Zamiast tego zapalamy baner z przyciskiem „Zaloguj się".
+  useEffect(() => {
+    if (netBootState !== "offline_guest" || guestServerBack) return;
+    let cancelled = false;
+    const serverUrl = settings.network.server_url;
+    const probe = async () => {
+      const ok = await serverApi.healthz(serverUrl);
+      if (ok && !cancelled) setGuestServerBack(true);
+    };
+    const timer = window.setInterval(() => void probe(), GUEST_HEALTH_RETRY_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [netBootState, guestServerBack, settings.network.server_url]);
+
   // ─────────── NetworkClient lifecycle (Phase 2B.3)
 
   useEffect(() => {
@@ -970,6 +1018,9 @@ export default function App() {
         // dla wiadomości flushed z offline queue (dotarły jako push gdy
         // user był offline, dźwięk już zagrał na native banner).
         lastReadyAtRef.current = Date.now();
+        // WS stoi, więc sieć żyje. Zdejmij baner „serwer niedostępny", jeśli
+        // wystartowaliśmy w trybie degradowanym i serwer wrócił w międzyczasie.
+        setNetBootState("logged_in");
         if (settings.network.token) {
           void refreshContacts(settings.network.server_url, settings.network.token);
           void refreshGroups(settings.network.server_url, settings.network.token);
@@ -2164,11 +2215,38 @@ export default function App() {
         netStats={netStats ?? undefined}
         onClose={() => setNetworkOpen(false)}
         onSaved={onSettingsSaved}
+        onOfflineFallback={() => {
+          setNetworkOpen(false);
+          setGuestServerBack(false);
+          setNetBootState("offline_guest");
+        }}
       />
       {netBootState === "server_unreachable" && (
         <div className="gg-net-offline-banner" role="status">
           Sieć Gaidu chwilowo niedostępna. Możesz korzystać z chatów AI;
           rozmowy ze znajomymi wrócą gdy serwer się odezwie.
+        </div>
+      )}
+      {netBootState === "offline_guest" && (
+        <div className="gg-net-offline-banner" role="status">
+          {guestServerBack ? (
+            <>
+              Sieć Gaidu znów odpowiada.{" "}
+              <button
+                type="button"
+                className="gg-net-offline-banner-btn"
+                onClick={() => setNetworkOpen(true)}
+              >
+                Zaloguj się
+              </button>
+            </>
+          ) : (
+            <>
+              Sieć Gaidu nie odpowiada, więc logowanie zostało pominięte. Chaty
+              AI, Notatki i Pomodoro działają lokalnie; rozmowy ze znajomymi
+              wrócą po zalogowaniu, gdy serwer wstanie.
+            </>
+          )}
         </div>
       )}
       <AddFriendDialog

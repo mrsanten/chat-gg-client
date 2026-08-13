@@ -12,6 +12,16 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "0.14.1",
+    date: "2026-08-13",
+    notes: [
+      "Logowanie nie jest już wymagane, gdy serwer sieci Gaidu nie odpowiada. Przy starcie sprawdzamy /healthz: jeśli serwer milczy i nie mamy zapisanej sesji, apka wchodzi w tryb lokalny zamiast wisieć na modalu logowania, którego nie da się przejść. Chaty AI, Notatki i Pomodoro działają normalnie.",
+      "W trybie lokalnym baner informuje, co jest wyłączone, a w tle co 30 s sprawdzamy czy serwer wrócił. Kiedy wróci, baner zamienia się w przycisk „Zaloguj się\". Modal nie wyskakuje sam, żeby nie przerwać pisania notatki.",
+      "Okno logowania: gdy próba padnie na braku łączności (albo 5xx z origin), pokazujemy przycisk „Pracuj offline\". Ratuje sytuację, gdy serwer padnie już po starcie apki.",
+      "Baner „sieć niedostępna\" znika sam po odzyskaniu połączenia WebSocket. Wcześniej zostawał na ekranie do restartu apki, mimo że rozmowy już działały.",
+    ],
+  },
+  {
     version: "0.14.0",
     date: "2026-05-17",
     notes: [
